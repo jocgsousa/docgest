@@ -5,6 +5,14 @@ import api from '../services/api';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Input from '../components/Input';
+import { 
+  Users, 
+  Building2, 
+  FileText, 
+  PenTool, 
+  BarChart3, 
+  DollarSign 
+} from 'lucide-react';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -103,48 +111,48 @@ const Reports = () => {
       id: 'users',
       title: 'Relatório de Usuários',
       description: 'Lista completa de usuários cadastrados no sistema com informações detalhadas.',
-      icon: '👥',
-      color: '#3B82F6',
+      icon: Users,
+      color: '#374151',
       permission: [1, 2] // Super Admin e Admin Empresa
     },
     {
       id: 'companies',
       title: 'Relatório de Empresas',
       description: 'Informações sobre empresas cadastradas, planos e status de vencimento.',
-      icon: '🏢',
-      color: '#10B981',
+      icon: Building2,
+      color: '#374151',
       permission: [1] // Apenas Super Admin
     },
     {
       id: 'documents',
       title: 'Relatório de Documentos',
       description: 'Estatísticas e detalhes sobre documentos criados e processados.',
-      icon: '📄',
-      color: '#F59E0B',
+      icon: FileText,
+      color: '#374151',
       permission: [1, 2, 3] // Todos
     },
     {
       id: 'signatures',
       title: 'Relatório de Assinaturas',
       description: 'Status das assinaturas, pendências e histórico de processamento.',
-      icon: '✍️',
-      color: '#8B5CF6',
+      icon: PenTool,
+      color: '#374151',
       permission: [1, 2, 3] // Todos
     },
     {
       id: 'activities',
       title: 'Relatório de Atividades',
       description: 'Log de atividades e ações realizadas pelos usuários no sistema.',
-      icon: '📊',
-      color: '#EF4444',
+      icon: BarChart3,
+      color: '#374151',
       permission: [1, 2] // Super Admin e Admin Empresa
     },
     {
       id: 'financial',
       title: 'Relatório Financeiro',
       description: 'Informações sobre planos, receitas e análise financeira.',
-      icon: '💰',
-      color: '#06B6D4',
+      icon: DollarSign,
+      color: '#374151',
       permission: [1] // Apenas Super Admin
     }
   ];
@@ -218,7 +226,7 @@ const Reports = () => {
         {availableReports.map(report => (
           <ReportCard key={report.id} onClick={() => handleGenerateReport(report.id)}>
             <ReportIcon color={report.color}>
-              {report.icon}
+              <report.icon size={24} />
             </ReportIcon>
             <ReportTitle>{report.title}</ReportTitle>
             <ReportDescription>{report.description}</ReportDescription>

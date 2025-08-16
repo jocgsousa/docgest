@@ -4,6 +4,19 @@ import { useAuth } from '../contexts/AuthContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import api from '../services/api';
+import { 
+  Building2, 
+  Users, 
+  FileText, 
+  PenTool, 
+  BarChart3, 
+  Clock, 
+  User, 
+  TrendingUp, 
+  Settings, 
+  Store, 
+  MessageCircle 
+} from 'lucide-react';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -216,29 +229,29 @@ function Dashboard() {
     if (isAdmin) {
       return [
         {
-          icon: '🏢',
-          color: '#3B82F6',
+          icon: Building2,
+          color: '#374151',
           value: stats.empresas,
           label: 'Empresas',
           change: '+12%'
         },
         {
-          icon: '👥',
-          color: '#10B981',
+          icon: Users,
+          color: '#374151',
           value: stats.usuarios,
           label: 'Usuários',
           change: '+8%'
         },
         {
-          icon: '📄',
-          color: '#F59E0B',
+          icon: FileText,
+          color: '#374151',
           value: stats.documentos,
           label: 'Documentos',
           change: '+15%'
         },
         {
-          icon: '✍️',
-          color: '#8B5CF6',
+          icon: PenTool,
+          color: '#374151',
           value: stats.assinaturas,
           label: 'Assinaturas',
           change: '+23%'
@@ -249,29 +262,29 @@ function Dashboard() {
     if (isCompanyAdmin) {
       return [
         {
-          icon: '👥',
-          color: '#10B981',
+          icon: Users,
+          color: '#374151',
           value: stats.usuarios,
           label: 'Usuários',
           change: '+5%'
         },
         {
-          icon: '📄',
-          color: '#F59E0B',
+          icon: FileText,
+          color: '#374151',
           value: stats.documentos,
           label: 'Documentos',
           change: '+18%'
         },
         {
-          icon: '✍️',
-          color: '#8B5CF6',
+          icon: PenTool,
+          color: '#374151',
           value: stats.assinaturas,
           label: 'Assinaturas',
           change: '+25%'
         },
         {
-          icon: '📊',
-          color: '#EF4444',
+          icon: BarChart3,
+          color: '#374151',
           value: '85%',
           label: 'Uso do Plano',
           change: '+10%'
@@ -282,22 +295,22 @@ function Dashboard() {
     // Assinante
     return [
       {
-        icon: '📄',
-        color: '#F59E0B',
+        icon: FileText,
+        color: '#374151',
         value: stats.documentos,
         label: 'Meus Documentos',
         change: '+12%'
       },
       {
-        icon: '✍️',
-        color: '#8B5CF6',
+        icon: PenTool,
+        color: '#374151',
         value: stats.assinaturas,
         label: 'Assinaturas',
         change: '+20%'
       },
       {
-        icon: '⏳',
-        color: '#EF4444',
+        icon: Clock,
+        color: '#374151',
         value: stats.pendentes || 0,
         label: 'Pendentes',
         change: '-5%'
@@ -308,26 +321,26 @@ function Dashboard() {
   const getQuickActions = () => {
     if (isAdmin) {
       return [
-        { label: 'Nova Empresa', path: '/empresas/nova', icon: '🏢' },
-        { label: 'Novo Usuário', path: '/usuarios/novo', icon: '👤' },
-        { label: 'Relatórios', path: '/relatorios', icon: '📈' },
-        { label: 'Configurações', path: '/configuracoes', icon: '⚙️' }
+        { label: 'Nova Empresa', path: '/empresas/nova', icon: Building2 },
+        { label: 'Novo Usuário', path: '/usuarios/novo', icon: User },
+        { label: 'Relatórios', path: '/relatorios', icon: TrendingUp },
+        { label: 'Configurações', path: '/configuracoes', icon: Settings }
       ];
     }
     
     if (isCompanyAdmin) {
       return [
-        { label: 'Novo Documento', path: '/documentos/novo', icon: '📄' },
-        { label: 'Nova Filial', path: '/filiais/nova', icon: '🏪' },
-        { label: 'Novo Usuário', path: '/usuarios/novo', icon: '👤' },
-        { label: 'WhatsApp', path: '/whatsapp', icon: '💬' }
+        { label: 'Novo Documento', path: '/documentos/novo', icon: FileText },
+        { label: 'Nova Filial', path: '/filiais/nova', icon: Store },
+        { label: 'Novo Usuário', path: '/usuarios/novo', icon: User },
+        { label: 'WhatsApp', path: '/whatsapp', icon: MessageCircle }
       ];
     }
     
     return [
-      { label: 'Novo Documento', path: '/documentos/novo', icon: '📄' },
-      { label: 'Minhas Assinaturas', path: '/assinaturas', icon: '✍️' },
-      { label: 'Meu Perfil', path: '/perfil', icon: '👤' }
+      { label: 'Novo Documento', path: '/documentos/novo', icon: FileText },
+      { label: 'Minhas Assinaturas', path: '/assinaturas', icon: PenTool },
+      { label: 'Meu Perfil', path: '/perfil', icon: User }
     ];
   };
   
@@ -350,7 +363,7 @@ function Dashboard() {
           <StatCard key={index} hover>
             <StatHeader>
               <StatIcon color={stat.color}>
-                {stat.icon}
+                <stat.icon size={24} />
               </StatIcon>
             </StatHeader>
             <StatValue>{stat.value}</StatValue>
@@ -402,7 +415,8 @@ function Dashboard() {
                 $fullWidth
                 onClick={() => window.location.href = action.path}
               >
-                {action.icon} {action.label}
+                <action.icon size={16} style={{ marginRight: '8px' }} />
+                {action.label}
               </Button>
             ))}
           </ActionsList>

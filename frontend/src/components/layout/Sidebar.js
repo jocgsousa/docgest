@@ -69,6 +69,13 @@ const LogoText = styled.span.withConfig({
   font-size: 1.25rem;
   font-weight: 700;
   color: ${props => props.theme.colors.primary};
+  transition: opacity 0.3s ease-in-out;
+  
+  ${props => props.collapsed && css`
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  `}
 `;
 
 const NavText = styled.span.withConfig({
