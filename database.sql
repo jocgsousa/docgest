@@ -1,0 +1,309 @@
+-- ================================================
+-- CRIAÇÃO DO BANCO DE DADOS DOCGEST
+-- ================================================
+CREATE DATABASE IF NOT EXISTS docgest;
+USE docgest;
+
+-- ================================================
+-- PLANOS
+-- ================================================
+CREATE TABLE planos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    preco DECIMAL(10,2) NOT NULL,
+    limite_usuarios INT NOT NULL,
+    limite_documentos INT NOT NULL,
+    limite_assinaturas INT NOT NULL,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ================================================
+-- EMPRESAS
+-- ================================================
+CREATE TABLE empresas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(150) NOT NULL,
+    cnpj VARCHAR(18) UNIQUE NOT NULL,
+    email VARCHAR(150) NOT NULL,
+    telefone VARCHAR(20),
+    endereco TEXT,
+    cidade VARCHAR(100),
+    estado VARCHAR(2),
+    cep VARCHAR(10),
+    plano_id INT NOT NULL,
+    data_vencimento DATE NOT NULL,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (plano_id) REFERENCES planos(id)
+);
+
+-- ================================================
+-- FILIAIS
+-- ================================================
+CREATE TABLE filiais (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT NOT NULL,
+    nome VARCHAR(150) NOT NULL,
+    cnpj VARCHAR(18) UNIQUE,
+    inscricao_estadual VARCHAR(20),
+    endereco TEXT,
+    cidade VARCHAR(100),
+    estado VARCHAR(2),
+    cep VARCHAR(10),
+    telefone VARCHAR(20),
+    email VARCHAR(150),
+    responsavel VARCHAR(150),
+    observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+);
+
+-- ================================================
+-- USUÁRIOS
+-- ================================================
+CREATE TABLE usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(150) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    senha VARCHAR(255) NOT NULL,
+    cpf VARCHAR(14) UNIQUE,
+    telefone VARCHAR(20),
+    tipo_usuario TINYINT NOT NULL COMMENT '1=Super Admin, 2=Admin Empresa, 3=Assinante',
+    empresa_id INT,
+    filial_id INT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
+    FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL
+);
+
+-- ================================================
+-- DOCUMENTOS
+-- ================================================
+CREATE TABLE documentos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(200) NOT NULL,
+    descricao TEXT,
+    nome_arquivo VARCHAR(255) NOT NULL,
+    caminho_arquivo VARCHAR(500) NOT NULL,
+    tamanho_arquivo BIGINT,
+    tipo_arquivo VARCHAR(100),
+    status ENUM('rascunho','enviado','assinado','cancelado') DEFAULT 'rascunho',
+    criado_por INT NOT NULL,
+    empresa_id INT NOT NULL,
+    filial_id INT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (criado_por) REFERENCES usuarios(id),
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
+    FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL
+);
+
+-- ================================================
+-- ASSINATURAS
+-- ================================================
+CREATE TABLE assinaturas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    documento_id INT NOT NULL,
+    status ENUM('pendente','assinado','rejeitado','cancelado','expirado') DEFAULT 'pendente',
+    data_expiracao DATETIME,
+    criado_por INT NOT NULL,
+    empresa_id INT NOT NULL,
+    filial_id INT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (documento_id) REFERENCES documentos(id) ON DELETE CASCADE,
+    FOREIGN KEY (criado_por) REFERENCES usuarios(id),
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
+    FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL
+);
+
+-- ================================================
+-- SIGNATÁRIOS
+-- ================================================
+CREATE TABLE signatarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    assinatura_id INT NOT NULL,
+    nome VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NOT NULL,
+    ordem INT NOT NULL,
+    status ENUM('pendente','assinado','rejeitado') DEFAULT 'pendente',
+    token VARCHAR(100) NOT NULL,
+    data_assinatura DATETIME,
+    ip_assinatura VARCHAR(45),
+    user_agent TEXT,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (assinatura_id) REFERENCES assinaturas(id) ON DELETE CASCADE
+);
+
+-- ================================================
+-- INSERÇÃO DE DADOS INICIAIS
+-- ================================================
+
+-- Planos padrão
+INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas) VALUES
+('Plano Básico', 'Ideal para pequenas empresas', 99.90, 5, 50, 100),
+('Plano Profissional', 'Para empresas médias', 199.90, 15, 200, 500),
+('Plano Enterprise', 'Para grandes empresas', 399.90, 50, 1000, 2000);
+
+-- Empresa exemplo
+INSERT INTO empresas (nome, cnpj, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
+('Empresa Exemplo LTDA', '12.345.678/0001-90', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
+
+-- Filial exemplo
+INSERT INTO filiais (empresa_id, nome, endereco, telefone, email) VALUES
+(1, 'Matriz', 'Rua Exemplo, 123', '(11) 99999-0000', 'matriz@exemplo.com');
+
+-- Usuários padrão (senha: 123456)
+INSERT INTO usuarios (nome, email, senha, cpf, telefone, tipo_usuario, empresa_id, filial_id) VALUES
+('Super Admin', 'admin@docgest.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '000.000.000-00', '(11) 99999-0001', 1, NULL, NULL),
+('Admin Empresa', 'admin@exemplo.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '111.111.111-11', '(11) 99999-0002', 2, 1, 1),
+('Usuário Teste', 'usuario@exemplo.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '222.222.222-22', '(11) 99999-0003', 3, 1, 1);
+
+-- Documento exemplo
+INSERT INTO documentos (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, criado_por, empresa_id, filial_id) VALUES
+('Contrato de Exemplo', 'Documento de exemplo para testes', 'contrato-exemplo.pdf', '/uploads/documentos/contrato-exemplo.pdf', 1024000, 'application/pdf', 'rascunho', 2, 1, 1);
+
+-- ================================================
+-- ÍNDICES PARA PERFORMANCE
+-- ================================================
+CREATE INDEX idx_usuarios_email ON usuarios(email);
+CREATE INDEX idx_usuarios_empresa ON usuarios(empresa_id);
+CREATE INDEX idx_usuarios_tipo ON usuarios(tipo_usuario);
+CREATE INDEX idx_empresas_cnpj ON empresas(cnpj);
+CREATE INDEX idx_documentos_empresa ON documentos(empresa_id);
+CREATE INDEX idx_documentos_status ON documentos(status);
+CREATE INDEX idx_assinaturas_documento ON assinaturas(documento_id);
+CREATE INDEX idx_assinaturas_status ON assinaturas(status);
+CREATE UNIQUE INDEX idx_signatarios_token ON signatarios(token);
+CREATE INDEX idx_signatarios_email ON signatarios(email);
+
+-- ================================================
+-- VIEWS ÚTEIS
+-- ================================================
+
+-- View para usuários com informações completas
+CREATE VIEW vw_usuarios_completo AS
+SELECT 
+    u.id,
+    u.nome,
+    u.email,
+    u.cpf,
+    u.telefone,
+    u.tipo_usuario,
+    CASE 
+        WHEN u.tipo_usuario = 1 THEN 'Super Admin'
+        WHEN u.tipo_usuario = 2 THEN 'Admin Empresa'
+        WHEN u.tipo_usuario = 3 THEN 'Assinante'
+        ELSE 'Desconhecido'
+    END as tipo_usuario_nome,
+    u.empresa_id,
+    e.nome as empresa_nome,
+    u.filial_id,
+    f.nome as filial_nome,
+    u.ativo,
+    u.data_criacao
+FROM usuarios u
+LEFT JOIN empresas e ON u.empresa_id = e.id
+LEFT JOIN filiais f ON u.filial_id = f.id;
+
+-- View para documentos com informações completas
+CREATE VIEW vw_documentos_completo AS
+SELECT 
+    d.id,
+    d.titulo,
+    d.descricao,
+    d.nome_arquivo,
+    d.caminho_arquivo,
+    d.tamanho_arquivo,
+    d.tipo_arquivo,
+    d.status,
+    d.criado_por,
+    u.nome as criado_por_nome,
+    d.empresa_id,
+    e.nome as empresa_nome,
+    d.filial_id,
+    f.nome as filial_nome,
+    d.data_criacao,
+    d.data_atualizacao
+FROM documentos d
+LEFT JOIN usuarios u ON d.criado_por = u.id
+LEFT JOIN empresas e ON d.empresa_id = e.id
+LEFT JOIN filiais f ON d.filial_id = f.id
+WHERE d.ativo = 1;
+
+-- View para assinaturas com informações completas
+CREATE VIEW vw_assinaturas_completo AS
+SELECT 
+    a.id,
+    a.documento_id,
+    d.titulo as documento_titulo,
+    a.status,
+    a.data_expiracao,
+    a.criado_por,
+    u.nome as criado_por_nome,
+    a.empresa_id,
+    e.nome as empresa_nome,
+    a.filial_id,
+    f.nome as filial_nome,
+    a.data_criacao,
+    COUNT(s.id) as total_signatarios,
+    SUM(CASE WHEN s.status = 'assinado' THEN 1 ELSE 0 END) as signatarios_assinados,
+    SUM(CASE WHEN s.status = 'pendente' THEN 1 ELSE 0 END) as signatarios_pendentes
+FROM assinaturas a
+LEFT JOIN documentos d ON a.documento_id = d.id
+LEFT JOIN usuarios u ON a.criado_por = u.id
+LEFT JOIN empresas e ON a.empresa_id = e.id
+LEFT JOIN filiais f ON a.filial_id = f.id
+LEFT JOIN signatarios s ON a.id = s.assinatura_id
+WHERE a.ativo = 1
+GROUP BY a.id;
+
+-- ================================================
+-- TRIGGERS PARA AUDITORIA
+-- ================================================
+
+-- Trigger para atualizar data_atualizacao automaticamente
+DELIMITER //
+CREATE TRIGGER tr_usuarios_updated 
+    BEFORE UPDATE ON usuarios 
+    FOR EACH ROW 
+BEGIN
+    SET NEW.data_atualizacao = CURRENT_TIMESTAMP;
+END//
+
+CREATE TRIGGER tr_empresas_updated 
+    BEFORE UPDATE ON empresas 
+    FOR EACH ROW 
+BEGIN
+    SET NEW.data_atualizacao = CURRENT_TIMESTAMP;
+END//
+
+CREATE TRIGGER tr_documentos_updated 
+    BEFORE UPDATE ON documentos 
+    FOR EACH ROW 
+BEGIN
+    SET NEW.data_atualizacao = CURRENT_TIMESTAMP;
+END//
+
+DELIMITER ;
+
+-- ================================================
+-- COMENTÁRIOS FINAIS
+-- ================================================
+-- Este banco de dados foi criado para o sistema DocGest
+-- Sistema de gestão de documentos e assinaturas eletrônicas
+-- Versão: 1.0
+-- Data: 2024
+
+
