@@ -205,7 +205,7 @@ function Dashboard() {
       
       // Carregar estatísticas
       const statsResponse = await api.get('/dashboard/stats');
-      setStats(statsResponse.data);
+      setStats(statsResponse.data.data);
       
       // Carregar atividades recentes
       const activitiesResponse = await api.get('/dashboard/activities');
@@ -260,34 +260,39 @@ function Dashboard() {
     }
     
     if (isCompanyAdmin) {
+      const planUsage = stats.plano || {};
+      const avgUsage = planUsage.percentual_usuarios && planUsage.percentual_documentos && planUsage.percentual_assinaturas
+        ? Math.round((planUsage.percentual_usuarios + planUsage.percentual_documentos + planUsage.percentual_assinaturas) / 3)
+        : 0;
+      
       return [
         {
           icon: Users,
           color: '#374151',
-          value: stats.usuarios,
+          value: `${stats.usuarios}/${planUsage.limite_usuarios || 0}`,
           label: 'Usuários',
-          change: '+5%'
+          change: `${planUsage.percentual_usuarios || 0}%`
         },
         {
           icon: FileText,
           color: '#374151',
-          value: stats.documentos,
+          value: `${stats.documentos}/${planUsage.limite_documentos || 0}`,
           label: 'Documentos',
-          change: '+18%'
+          change: `${planUsage.percentual_documentos || 0}%`
         },
         {
           icon: PenTool,
           color: '#374151',
-          value: stats.assinaturas,
+          value: `${stats.assinaturas}/${planUsage.limite_assinaturas || 0}`,
           label: 'Assinaturas',
-          change: '+25%'
+          change: `${planUsage.percentual_assinaturas || 0}%`
         },
         {
           icon: BarChart3,
           color: '#374151',
-          value: '85%',
+          value: `${avgUsage}%`,
           label: 'Uso do Plano',
-          change: '+10%'
+          change: avgUsage > 80 ? 'Alto' : avgUsage > 50 ? 'Médio' : 'Baixo'
         }
       ];
     }

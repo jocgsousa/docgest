@@ -36,15 +36,30 @@ class DashboardController {
                     'empresas' => $this->companyModel->count(),
                     'documentos' => $this->documentModel->count(),
                     'assinaturas' => $this->signatureModel->count(),
-                    'pendentes' => $this->signatureModel->countPending()
+                    'pendentes' => $this->signatureModel->countPending(),
+                    'usuarios_por_tipo' => $this->userModel->countByType(),
+                    'empresas_por_plano' => $this->companyModel->countByPlan()
                 ];
             } elseif ($currentUser['tipo_usuario'] == 2) {
                 // Admin da Empresa - estatísticas da empresa
+                $planUsage = $this->companyModel->getPlanUsage($currentUser['empresa_id']);
+                
                 $stats = [
                     'usuarios' => $this->userModel->countByCompany($currentUser['empresa_id']),
                     'documentos' => $this->documentModel->countByCompany($currentUser['empresa_id']),
                     'assinaturas' => $this->signatureModel->countByCompany($currentUser['empresa_id']),
-                    'pendentes' => $this->signatureModel->countPendingByCompany($currentUser['empresa_id'])
+                    'pendentes' => $this->signatureModel->countPendingByCompany($currentUser['empresa_id']),
+                    'plano' => [
+                        'limite_usuarios' => $planUsage['limite_usuarios'] ?? 0,
+                        'limite_documentos' => $planUsage['limite_documentos'] ?? 0,
+                        'limite_assinaturas' => $planUsage['limite_assinaturas'] ?? 0,
+                        'usuarios_usados' => $planUsage['usuarios_usados'] ?? 0,
+                        'documentos_usados' => $planUsage['documentos_usados'] ?? 0,
+                        'assinaturas_usadas' => $planUsage['assinaturas_usadas'] ?? 0,
+                        'percentual_usuarios' => $planUsage['percentual_usuarios'] ?? 0,
+                        'percentual_documentos' => $planUsage['percentual_documentos'] ?? 0,
+                        'percentual_assinaturas' => $planUsage['percentual_assinaturas'] ?? 0
+                    ]
                 ];
             } else {
                 // Assinante - estatísticas pessoais

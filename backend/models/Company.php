@@ -362,6 +362,37 @@ class Company {
         
         return $stmt->fetchColumn();
     }
+    
+    /**
+     * Calcula o uso do plano de uma empresa
+     */
+    public function getPlanUsage($empresaId) {
+        $sql = "SELECT e.id, e.nome, p.limite_usuarios, p.limite_documentos, p.limite_assinaturas,
+                       (SELECT COUNT(*) FROM usuarios WHERE empresa_id = e.id AND ativo = 1) as usuarios_usados,
+                       (SELECT COUNT(*) FROM documentos WHERE empresa_id = e.id AND ativo = 1) as documentos_usados,
+                       (SELECT COUNT(*) FROM assinaturas WHERE empresa_id = e.id AND ativo = 1) as assinaturas_usadas
+                FROM empresas e
+                LEFT JOIN planos p ON e.plano_id = p.id
+                WHERE e.id = :empresa_id AND e.ativo = 1";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':empresa_id', $empresaId);
+        $stmt->execute();
+        
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result) {
+            // Calcular percentuais
+            $result['percentual_usuarios'] = $result['limite_usuarios'] > 0 ? 
+                round(($result['usuarios_usados'] / $result['limite_usuarios']) * 100, 2) : 0;
+            $result['percentual_documentos'] = $result['limite_documentos'] > 0 ? 
+                round(($result['documentos_usados'] / $result['limite_documentos']) * 100, 2) : 0;
+            $result['percentual_assinaturas'] = $result['limite_assinaturas'] > 0 ? 
+                round(($result['assinaturas_usadas'] / $result['limite_assinaturas']) * 100, 2) : 0;
+        }
+        
+        return $result;
+    }
 }
 
 ?>

@@ -510,4 +510,16 @@ class Signature {
         
         return $stmt->fetchColumn();
     }
+    
+    /**
+     * Conta assinaturas pendentes por usuário
+     */
+    public function countPendingByUser($userId) {
+        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE criado_por = :user_id AND status = 'pendente'";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        
+        return $stmt->fetchColumn();
+    }
 }
