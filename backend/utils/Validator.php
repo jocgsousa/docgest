@@ -4,7 +4,7 @@ class Validator {
     private $data;
     private $errors = [];
     
-    public function __construct($data) {
+    public function __construct($data = []) {
         $this->data = $data;
     }
     
@@ -284,9 +284,50 @@ class Validator {
     }
     
     /**
+     * Valida dados com regras específicas
+     */
+    public function validate($data, $rules) {
+        $this->data = $data;
+        $this->errors = [];
+        
+        foreach ($rules as $field => $ruleString) {
+            $fieldRules = explode('|', $ruleString);
+            
+            foreach ($fieldRules as $rule) {
+                if (strpos($rule, ':') !== false) {
+                    list($ruleName, $ruleValue) = explode(':', $rule, 2);
+                } else {
+                    $ruleName = $rule;
+                    $ruleValue = null;
+                }
+                
+                switch ($ruleName) {
+                    case 'required':
+                        $this->required($field);
+                        break;
+                    case 'email':
+                        $this->email($field);
+                        break;
+                    case 'min':
+                        $this->min($field, (int)$ruleValue);
+                        break;
+                    case 'max':
+                        $this->max($field, (int)$ruleValue);
+                        break;
+                    case 'cnpj':
+                        $this->cnpj($field);
+                        break;
+                }
+            }
+        }
+        
+        return !$this->hasErrors();
+    }
+    
+    /**
      * Valida e retorna erros se houver
      */
-    public function validate() {
+    public function validateAndRespond() {
         if ($this->hasErrors()) {
             Response::validation($this->errors);
         }

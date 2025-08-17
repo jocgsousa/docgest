@@ -405,6 +405,62 @@ class UserController {
             Response::handleException($e);
         }
     }
+    
+    /**
+     * Busca usuários por empresa e filial para seleção de assinantes
+     */
+    public function getByCompanyAndBranch() {
+        try {
+            $authUser = JWT::requireAuth();
+            
+            $empresa_id = $_GET['empresa_id'] ?? null;
+            $filial_id = $_GET['filial_id'] ?? null;
+            
+            if (!$empresa_id) {
+                Response::validation(['empresa_id' => ['Empresa é obrigatória']]);
+                return;
+            }
+            
+            // Verificar permissões
+            if ($authUser['tipo_usuario'] == 2 && $authUser['empresa_id'] != $empresa_id) {
+                Response::forbidden('Acesso negado');
+                return;
+            }
+            
+            if ($authUser['tipo_usuario'] == 3) {
+                if ($authUser['empresa_id'] != $empresa_id || 
+                    ($filial_id && $authUser['filial_id'] != $filial_id)) {
+                    Response::forbidden('Acesso negado');
+                    return;
+                }
+            }
+            
+            $filters = [
+                'empresa_id' => $empresa_id,
+                'tipo_usuario' => 3 // Apenas assinantes
+            ];
+            
+            if ($filial_id) {
+                $filters['filial_id'] = $filial_id;
+            }
+            
+            $result = $this->userModel->list($filters, 1, 1000); // Buscar todos os usuários
+            
+            // Formatar para select
+            $users = array_map(function($user) {
+                return [
+                    'id' => $user['id'],
+                    'nome' => $user['nome'],
+                    'email' => $user['email'],
+                    'filial_nome' => $user['filial_nome'] ?? 'Sem filial'
+                ];
+            }, $result['data']);
+            
+            Response::success($users);
+        } catch (Exception $e) {
+            Response::error('Erro ao buscar usuários: ' . $e->getMessage());
+        }
+    }
 }
 
 ?>

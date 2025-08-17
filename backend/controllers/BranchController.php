@@ -66,6 +66,11 @@ class BranchController {
             // Admin de empresa só pode ver filiais da sua empresa
             if ($user['tipo_usuario'] == 2) {
                 $empresaId = $user['empresa_id'];
+            } else {
+                // Super admin pode filtrar por empresa_id se fornecido
+                if (isset($_GET['empresa_id']) && !empty($_GET['empresa_id'])) {
+                    $empresaId = $_GET['empresa_id'];
+                }
             }
             
             $branches = $this->branchModel->listAll($empresaId);

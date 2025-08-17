@@ -7,6 +7,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -136,7 +137,10 @@ const Documents = () => {
   const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
-    arquivo: null
+    arquivo: null,
+    empresa_id: '',
+    filial_id: '',
+    assinantes: []
   });
   const [filters, setFilters] = useState({
     search: '',
@@ -150,6 +154,10 @@ const Documents = () => {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   const statusOptions = [
     { value: '', label: 'Todos os status' },
@@ -239,6 +247,26 @@ const Documents = () => {
     fetchStats();
   }, [filters, pagination.page]);
 
+  useEffect(() => {
+    loadCompanies();
+  }, []);
+
+  useEffect(() => {
+    if (formData.empresa_id) {
+      loadBranches(formData.empresa_id);
+      loadUsers(formData.empresa_id, formData.filial_id);
+    } else {
+      setBranches([]);
+      setAvailableUsers([]);
+    }
+  }, [formData.empresa_id]);
+
+  useEffect(() => {
+    if (formData.empresa_id && formData.filial_id) {
+      loadUsers(formData.empresa_id, formData.filial_id);
+    }
+  }, [formData.filial_id]);
+
   const fetchDocuments = async () => {
     try {
       setLoading(true);
@@ -258,6 +286,53 @@ const Documents = () => {
       console.error('Erro ao buscar documentos:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Carregar empresas
+  const loadCompanies = async () => {
+    try {
+      const response = await api.get('/companies/all');
+      if (response.data.success) {
+        setCompanies(Array.isArray(response.data.data) ? response.data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar empresas:', error);
+      setCompanies([]);
+    }
+  };
+
+  // Carregar filiais por empresa
+  const loadBranches = async (empresaId) => {
+    try {
+      const response = await api.get(`/branches/all?empresa_id=${empresaId}`);
+      if (response.data.success) {
+        setBranches(Array.isArray(response.data.data) ? response.data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar filiais:', error);
+      setBranches([]);
+    }
+  };
+
+  // Carregar usuários por empresa e filial
+  const loadUsers = async (empresaId, filialId) => {
+    if (!empresaId) return;
+    
+    try {
+      setLoadingUsers(true);
+      const params = { empresa_id: empresaId };
+      if (filialId) params.filial_id = filialId;
+      
+      const response = await api.get('/users/by-company-branch', { params });
+      if (response.data.success) {
+        setAvailableUsers(Array.isArray(response.data.data) ? response.data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+      setAvailableUsers([]);
+    } finally {
+      setLoadingUsers(false);
     }
   };
 
@@ -282,6 +357,15 @@ const Documents = () => {
       if (formData.arquivo) {
         submitData.append('arquivo', formData.arquivo);
       }
+      if (formData.empresa_id) {
+        submitData.append('empresa_id', formData.empresa_id);
+      }
+      if (formData.filial_id) {
+        submitData.append('filial_id', formData.filial_id);
+      }
+      if (formData.assinantes && formData.assinantes.length > 0) {
+        submitData.append('assinantes', JSON.stringify(formData.assinantes));
+      }
 
       if (editingDocument) {
         await api.put(`/documents/${editingDocument.id}`, submitData, {
@@ -304,7 +388,7 @@ const Documents = () => {
       fetchStats();
     } catch (error) {
       if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
+        setErrors(formatErrors(error.response.data.errors));
       }
     } finally {
       setSubmitting(false);
@@ -344,10 +428,13 @@ const Documents = () => {
   };
 
   const resetForm = () => {
-    setFormData({
-      titulo: '',
-      descricao: '',
-      arquivo: null
+    setFormData({ 
+      titulo: '', 
+      descricao: '', 
+      arquivo: null, 
+      empresa_id: '', 
+      filial_id: '', 
+      assinantes: [] 
     });
     setErrors({});
   };
@@ -496,6 +583,137 @@ const Documents = () => {
               {errors.descricao && (
                 <span style={{ color: '#dc2626', fontSize: '12px' }}>
                   {errors.descricao[0]}
+                </span>
+              )}
+            </div>
+          </FormRow>
+
+          <FormGrid>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Empresa *
+              </label>
+              <select
+                value={formData.empresa_id}
+                onChange={(e) => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    empresa_id: e.target.value,
+                    filial_id: '',
+                    assinantes: []
+                  }));
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                required
+              >
+                <option value="">Selecione uma empresa</option>
+                {Array.isArray(companies) && companies.map(company => (
+                  <option key={company.id} value={company.id}>
+                    {company.nome}
+                  </option>
+                ))}
+              </select>
+              {errors.empresa_id && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.empresa_id}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Filial
+              </label>
+              <select
+                value={formData.filial_id}
+                onChange={(e) => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    filial_id: e.target.value,
+                    assinantes: []
+                  }));
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                disabled={!formData.empresa_id || branches.length === 0}
+              >
+                <option value="">Todas as filiais</option>
+                {Array.isArray(branches) && branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </FormGrid>
+
+          <FormRow>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Assinantes *
+              </label>
+              <div style={{ 
+                border: '1px solid #d1d5db', 
+                borderRadius: '6px', 
+                maxHeight: '150px', 
+                overflowY: 'auto',
+                padding: '8px'
+              }}>
+                {loadingUsers ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                    Carregando usuários...
+                  </div>
+                ) : availableUsers.length === 0 ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                    {formData.empresa_id ? 'Nenhum usuário encontrado' : 'Selecione uma empresa primeiro'}
+                  </div>
+                ) : (
+                  Array.isArray(availableUsers) && availableUsers.map(user => (
+                    <label key={user.id} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      padding: '4px 0',
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.assinantes.includes(user.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData(prev => ({
+                              ...prev,
+                              assinantes: [...prev.assinantes, user.id]
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              assinantes: prev.assinantes.filter(id => id !== user.id)
+                            }));
+                          }
+                        }}
+                      />
+                      <span style={{ fontSize: '14px' }}>
+                        {user.nome} ({user.email})
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+              {errors.assinantes && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.assinantes}
                 </span>
               )}
             </div>

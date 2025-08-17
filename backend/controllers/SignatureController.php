@@ -14,6 +14,7 @@ class SignatureController {
     public function __construct() {
         $this->signature = new Signature();
         $this->document = new Document();
+        $this->validator = new Validator();
     }
     
     public function index() {

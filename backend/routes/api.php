@@ -102,6 +102,8 @@ try {
                         $controller->index();
                     } elseif ($id === 'stats') {
                         $controller->stats();
+                    } elseif ($id === 'by-company-branch') {
+                        $controller->getByCompanyAndBranch();
                     } elseif ($action === null) {
                         $controller->show($id);
                     } elseif ($action === 'empresa') {

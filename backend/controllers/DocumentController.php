@@ -1,16 +1,20 @@
 <?php
 
 require_once __DIR__ . '/../models/Document.php';
+require_once __DIR__ . '/../models/DocumentAssinante.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/../utils/JWT.php';
 
 class DocumentController {
     private $document;
+    private $documentAssinante;
     private $validator;
     
     public function __construct() {
         $this->document = new Document();
+        $this->documentAssinante = new DocumentAssinante();
+        $this->validator = new Validator();
     }
     
     public function index() {
@@ -86,20 +90,40 @@ class DocumentController {
             // Validação dos dados
             $rules = [
                 'titulo' => 'required|max:255',
-                'descricao' => 'max:1000'
+                'descricao' => 'max:1000',
+                'empresa_id' => 'required',
+                'assinantes' => 'required'
             ];
             
             $data = [
                 'titulo' => $_POST['titulo'] ?? '',
-                'descricao' => $_POST['descricao'] ?? ''
+                'descricao' => $_POST['descricao'] ?? '',
+                'empresa_id' => $_POST['empresa_id'] ?? '',
+                'filial_id' => $_POST['filial_id'] ?? null,
+                'assinantes' => $_POST['assinantes'] ?? ''
             ];
             
             $validator = new Validator($data);
             $validator->required('titulo', 'Título é obrigatório');
+            $validator->required('empresa_id', 'Empresa é obrigatória');
+            $validator->required('assinantes', 'Pelo menos um assinante é obrigatório');
             
             $validator->validate();
             if ($validator->hasErrors()) {
                 Response::validation($validator->getErrors());
+                return;
+            }
+            
+            // Validar e processar assinantes
+            $assinantes = [];
+            if (is_string($data['assinantes'])) {
+                $assinantes = json_decode($data['assinantes'], true);
+            } else if (is_array($data['assinantes'])) {
+                $assinantes = $data['assinantes'];
+            }
+            
+            if (empty($assinantes) || !is_array($assinantes)) {
+                Response::validation(['assinantes' => ['Pelo menos um assinante é obrigatório']]);
                 return;
             }
             
@@ -149,8 +173,8 @@ class DocumentController {
                 'tipo_arquivo' => $file['type'],
                 'status' => 'rascunho',
                 'criado_por' => $user['user_id'],
-                'empresa_id' => $user['empresa_id'] ?? 1, // Default para empresa 1 se não especificado
-                'filial_id' => $user['filial_id']
+                'empresa_id' => $data['empresa_id'],
+                'filial_id' => $data['filial_id']
             ];
             
             // Remove campos nulos para evitar erros de constraint
@@ -161,8 +185,33 @@ class DocumentController {
             $documentId = $this->document->create($documentData);
             
             if ($documentId) {
-                $newDocument = $this->document->findById($documentId);
-                Response::created($newDocument, 'Documento criado com sucesso');
+                // Criar vinculações com os assinantes
+                $assinantesCreated = true;
+                foreach ($assinantes as $assinante) {
+                    $assinanteData = [
+                        'documento_id' => $documentId,
+                        'usuario_id' => $assinante,
+                        'status' => 'pendente',
+                        'observacoes' => null
+                    ];
+                    
+                    if (!$this->documentAssinante->create($assinanteData)) {
+                        $assinantesCreated = false;
+                        break;
+                    }
+                }
+                
+                if ($assinantesCreated) {
+                    $newDocument = $this->document->findById($documentId);
+                    Response::created($newDocument, 'Documento criado com sucesso');
+                } else {
+                    // Remover arquivo e documento se falhou ao criar assinantes
+                    if (file_exists($filePath)) {
+                        unlink($filePath);
+                    }
+                    $this->document->delete($documentId);
+                    Response::error('Erro ao vincular assinantes ao documento');
+                }
             } else {
                 // Remover arquivo se falhou ao salvar no banco
                 if (file_exists($filePath)) {

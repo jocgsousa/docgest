@@ -147,6 +147,25 @@ CREATE TABLE signatarios (
 );
 
 -- ================================================
+-- DOCUMENTO ASSINANTES (Vinculação de documentos a usuários específicos)
+-- ================================================
+CREATE TABLE documento_assinantes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    documento_id INT NOT NULL,
+    usuario_id INT NOT NULL,
+    status ENUM('pendente','visualizado','assinado','rejeitado') DEFAULT 'pendente',
+    data_visualizacao DATETIME,
+    data_assinatura DATETIME,
+    observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (documento_id) REFERENCES documentos(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_documento_usuario (documento_id, usuario_id)
+);
+
+-- ================================================
 -- INSERÇÃO DE DADOS INICIAIS
 -- ================================================
 

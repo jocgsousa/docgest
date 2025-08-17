@@ -8,6 +8,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -99,6 +100,7 @@ function Branches() {
     total: 0
   });
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   const columns = [
@@ -223,7 +225,11 @@ function Branches() {
       });
       fetchBranches();
     } catch (error) {
-      setError(error.response?.data?.message || 'Erro ao salvar filial');
+      if (error.response?.data?.errors) {
+        setErrors(formatErrors(error.response.data.errors));
+      } else {
+        setError(error.response?.data?.message || 'Erro ao salvar filial');
+      }
     } finally {
       setSubmitting(false);
       // Atualizar dados do contexto
@@ -389,12 +395,14 @@ function Branches() {
               label="Nome *"
               value={formData.nome}
               onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              error={errors.nome?.[0]}
               required
             />
             <Input
               label="CNPJ"
               value={formData.cnpj}
               onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
+              error={errors.cnpj?.[0]}
               placeholder="00.000.000/0000-00"
             />
           </FormGrid>
@@ -404,11 +412,13 @@ function Branches() {
               label="Inscrição Estadual"
               value={formData.inscricao_estadual}
               onChange={(e) => setFormData({ ...formData, inscricao_estadual: e.target.value })}
+              error={errors.inscricao_estadual?.[0]}
             />
             <Input
               label="Telefone"
               value={formData.telefone}
               onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+              error={errors.telefone?.[0]}
             />
           </FormGrid>
           
@@ -417,6 +427,7 @@ function Branches() {
               label="Endereço"
               value={formData.endereco}
               onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+              error={errors.endereco?.[0]}
             />
           </FormRow>
           
@@ -425,11 +436,13 @@ function Branches() {
               label="Cidade"
               value={formData.cidade}
               onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+              error={errors.cidade?.[0]}
             />
             <Input
               label="Estado"
               value={formData.estado}
               onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+              error={errors.estado?.[0]}
               placeholder="SP"
               maxLength="2"
             />
@@ -440,6 +453,7 @@ function Branches() {
               label="CEP"
               value={formData.cep}
               onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+              error={errors.cep?.[0]}
               placeholder="00000-000"
             />
             <div></div>
@@ -451,11 +465,13 @@ function Branches() {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              error={errors.email?.[0]}
             />
             <Input
               label="Responsável"
               value={formData.responsavel}
               onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+              error={errors.responsavel?.[0]}
             />
           </FormGrid>
           
@@ -464,6 +480,7 @@ function Branches() {
               label="Observações"
               value={formData.observacoes}
               onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              error={errors.observacoes?.[0]}
               multiline
               rows={3}
             />
@@ -487,6 +504,11 @@ function Branches() {
               <option value="ativo">Ativo</option>
               <option value="inativo">Inativo</option>
             </select>
+            {errors.status && (
+              <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                {errors.status[0]}
+              </span>
+            )}
           </FormRow>
 
           {error && (

@@ -7,6 +7,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -317,7 +318,7 @@ const Signatures = () => {
       fetchStats();
     } catch (error) {
       if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
+        setErrors(formatErrors(error.response.data.errors));
       }
     } finally {
       setSubmitting(false);

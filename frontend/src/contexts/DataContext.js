@@ -26,9 +26,9 @@ export const DataProvider = ({ children }) => {
   });
   const [error, setError] = useState(null);
 
-  // Carregar empresas (apenas para admins)
+  // Carregar empresas (para super admins e admins de empresa)
   const loadCompanies = async (params = {}) => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isCompanyAdmin) return;
     
     try {
       setLoading(prev => ({ ...prev, companies: true }));
@@ -74,7 +74,7 @@ export const DataProvider = ({ children }) => {
       });
       
       const response = await api.get(`/branches?${queryParams}`);
-      setBranches(response.data.data || []);
+      setBranches(response.data.data?.items || []);
     } catch (error) {
       console.error('Erro ao carregar filiais:', error);
       setError('Erro ao carregar filiais');
@@ -106,7 +106,7 @@ export const DataProvider = ({ children }) => {
   const refreshAll = async () => {
     const promises = [];
     
-    if (isAdmin) {
+    if (isAdmin || isCompanyAdmin) {
       promises.push(loadCompanies());
     }
     

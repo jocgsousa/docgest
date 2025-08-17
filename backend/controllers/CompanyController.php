@@ -100,7 +100,7 @@ class CompanyController {
                 ->required('plano_id', 'Plano é obrigatório')
                 ->exists('plano_id', 'planos', 'id', 'Plano não encontrado')
                 ->required('data_vencimento', 'Data de vencimento é obrigatória')
-                ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser válida no formato Y-m-d (AAAA-MM-DD)');
+                ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
             
             $validator->validate();
             
@@ -188,7 +188,7 @@ class CompanyController {
             }
             
             if (isset($input['data_vencimento'])) {
-                $validator->date('data_vencimento', 'Data de vencimento deve ser válida');
+                $validator->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
                 
                 // Admin da empresa não pode alterar data de vencimento
                 if ($currentUser['tipo_usuario'] == 2) {
@@ -284,11 +284,11 @@ class CompanyController {
             if ($user['tipo_usuario'] == 2) {
                 $companies = $this->companyModel->listByUser($user['empresa_id']);
             } else {
-                // Super admin pode ver todas
+                // Super admin pode ver todas as empresas
                 $companies = $this->companyModel->listAll();
             }
             
-            Response::success($companies, 'Lista de empresas recuperada com sucesso');
+            Response::success($companies, 'Empresas recuperadas com sucesso');
             
         } catch (Exception $e) {
             Response::handleException($e);
@@ -368,7 +368,7 @@ class CompanyController {
             // Validação
             $validator = Validator::make($input)
                 ->required('data_vencimento', 'Nova data de vencimento é obrigatória')
-                ->date('data_vencimento', 'Data de vencimento deve ser válida');
+                ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
             
             $validator->validate();
             

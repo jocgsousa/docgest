@@ -78,14 +78,17 @@ class PlanController {
                 ->required('nome', 'Nome é obrigatório')
                 ->min('nome', 2, 'Nome deve ter pelo menos 2 caracteres')
                 ->max('nome', 100, 'Nome deve ter no máximo 100 caracteres')
-                ->required('preco', 'Preço é obrigatório')
-                ->numeric('preco', 'Preço deve ser um número válido')
                 ->required('limite_usuarios', 'Limite de usuários é obrigatório')
                 ->integer('limite_usuarios', 'Limite de usuários deve ser um número inteiro')
                 ->required('limite_documentos', 'Limite de documentos é obrigatório')
                 ->integer('limite_documentos', 'Limite de documentos deve ser um número inteiro')
                 ->required('limite_assinaturas', 'Limite de assinaturas é obrigatório')
                 ->integer('limite_assinaturas', 'Limite de assinaturas deve ser um número inteiro');
+            
+            // Validar preço se fornecido
+            if (isset($input['preco'])) {
+                $validator->numeric('preco', 'Preço deve ser um número válido');
+            }
             
             $validator->validate();
             
@@ -95,7 +98,7 @@ class PlanController {
             }
             
             // Validar valores mínimos
-            if ($input['preco'] < 0) {
+            if (isset($input['preco']) && $input['preco'] < 0) {
                 Response::validation(['preco' => ['Preço deve ser maior ou igual a zero']]);
             }
             
@@ -115,7 +118,7 @@ class PlanController {
             $planData = [
                 'nome' => $input['nome'],
                 'descricao' => $input['descricao'] ?? null,
-                'preco' => $input['preco'],
+                'preco' => $input['preco'] ?? 0, // Padrão para plano gratuito
                 'limite_usuarios' => $input['limite_usuarios'],
                 'limite_documentos' => $input['limite_documentos'],
                 'limite_assinaturas' => $input['limite_assinaturas']

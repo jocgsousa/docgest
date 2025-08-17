@@ -8,6 +8,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -98,6 +99,7 @@ const Users = ({ openCreateModal = false }) => {
     empresa_id: '',
     filial_id: ''
   });
+  const [availableBranches, setAvailableBranches] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
     tipo_usuario: '',
@@ -233,7 +235,7 @@ const Users = ({ openCreateModal = false }) => {
       fetchUsers();
     } catch (error) {
       if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
+        setErrors(formatErrors(error.response.data.errors));
       }
     } finally {
       setSubmitting(false);
@@ -277,6 +279,7 @@ const Users = ({ openCreateModal = false }) => {
       empresa_id: '',
       filial_id: ''
     });
+    setAvailableBranches([]);
     setErrors({});
   };
 
@@ -291,7 +294,32 @@ const Users = ({ openCreateModal = false }) => {
 
   const canCreateUser = user?.tipo_usuario === 1 || user?.tipo_usuario === 2;
   const showCompanyFilter = user?.tipo_usuario === 1;
-  const showCompanySelect = user?.tipo_usuario === 1;
+  const showCompanySelect = user?.tipo_usuario === 1 || user?.tipo_usuario === 2;
+  const showBranchSelect = formData.tipo_usuario == 3; // Mostrar filial apenas para assinantes
+
+  // Carregar filiais quando empresa for selecionada
+  useEffect(() => {
+    if (formData.empresa_id && showBranchSelect && Array.isArray(branches)) {
+      const companyBranches = branches.filter(branch => branch.empresa_id == formData.empresa_id);
+      setAvailableBranches(companyBranches);
+      // Limpar filial selecionada se não estiver mais disponível
+      if (formData.filial_id && !companyBranches.find(b => b.id == formData.filial_id)) {
+        setFormData(prev => ({ ...prev, filial_id: '' }));
+      }
+    } else {
+      setAvailableBranches([]);
+      setFormData(prev => ({ ...prev, filial_id: '' }));
+    }
+  }, [formData.empresa_id, formData.tipo_usuario, branches]);
+
+  // Limpar empresa e filial quando tipo de usuário mudar
+  useEffect(() => {
+    if (formData.tipo_usuario == 1) {
+      setFormData(prev => ({ ...prev, empresa_id: '', filial_id: '' }));
+    } else if (formData.tipo_usuario == 2) {
+      setFormData(prev => ({ ...prev, filial_id: '' }));
+    }
+  }, [formData.tipo_usuario]);
 
   return (
     <PageContainer>
@@ -469,6 +497,38 @@ const Users = ({ openCreateModal = false }) => {
                 {errors.empresa_id && (
                   <span style={{ color: '#dc2626', fontSize: '12px' }}>
                     {errors.empresa_id[0]}
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {showBranchSelect && formData.empresa_id && (
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Filial
+                </label>
+                <select
+                  value={formData.filial_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, filial_id: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                  required
+                >
+                  <option value="">Selecione uma filial</option>
+                  {availableBranches.map(branch => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.nome}
+                    </option>
+                  ))}
+                </select>
+                {errors.filial_id && (
+                  <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                    {errors.filial_id[0]}
                   </span>
                 )}
               </div>
