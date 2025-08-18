@@ -8,6 +8,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
@@ -214,16 +215,35 @@ const Companies = ({ openCreateModal = false }) => {
       
       const params = new URLSearchParams(queryParams);
       
-      // Super Admin usa /companies/all para listar todas as empresas
-      // Admin de Empresa usa /companies para listar apenas sua empresa
-      const endpoint = user?.tipo_usuario === 1 ? '/companies/all' : '/companies';
+      // Tanto Super Admin quanto Admin de Empresa usam /companies com paginação
+      const endpoint = '/companies';
       const response = await api.get(`${endpoint}?${params}`);
       
-      setCompanies(response.data.data?.items || []);
-      setPagination(prev => ({
-        ...prev,
-        total: response.data.data?.pagination?.total || 0
-      }));
+      // A API retorna dados paginados com estrutura padrão
+      const responseData = response.data.data;
+      
+      if (responseData?.items) {
+        // Se data tem estrutura paginada com items
+        setCompanies(responseData.items || []);
+        setPagination(prev => ({
+          ...prev,
+          total: responseData.pagination?.total || 0
+        }));
+      } else if (Array.isArray(responseData)) {
+        // Se data é um array, usar diretamente (fallback)
+        setCompanies(responseData);
+        setPagination(prev => ({
+          ...prev,
+          total: responseData.length
+        }));
+      } else {
+        // Fallback para array vazio
+        setCompanies([]);
+        setPagination(prev => ({
+          ...prev,
+          total: 0
+        }));
+      }
     } catch (error) {
       console.error('Erro ao buscar empresas:', error);
     } finally {
@@ -390,12 +410,17 @@ const Companies = ({ openCreateModal = false }) => {
           columns={columns}
           data={companies}
           loading={loading}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: handlePageChange
-          }}
+          emptyMessage="Nenhuma empresa encontrada"
+        />
+        
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={Math.ceil(pagination.total / pagination.pageSize)}
+          totalItems={pagination.total}
+          pageSize={pagination.pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={(pageSize) => setPagination(prev => ({ ...prev, pageSize, page: 1 }))}
+          pageSizeOptions={[10, 25, 50, 100]}
         />
       </Card>
 

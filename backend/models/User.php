@@ -116,9 +116,9 @@ class User {
      */
     public function create($data) {
         $sql = "INSERT INTO {$this->table} 
-                (nome, email, senha, cpf, telefone, tipo_usuario, empresa_id, filial_id, ativo, data_criacao)
+                (nome, email, senha, cpf, telefone, profissao_id, tipo_usuario, empresa_id, filial_id, ativo, data_criacao)
                 VALUES 
-                (:nome, :email, :senha, :cpf, :telefone, :tipo_usuario, :empresa_id, :filial_id, 1, NOW())";
+                (:nome, :email, :senha, :cpf, :telefone, :profissao_id, :tipo_usuario, :empresa_id, :filial_id, 1, NOW())";
         
         $stmt = $this->conn->prepare($sql);
         
@@ -130,6 +130,7 @@ class User {
         $stmt->bindParam(':senha', $hashedPassword);
         $stmt->bindParam(':cpf', $data['cpf']);
         $stmt->bindParam(':telefone', $data['telefone']);
+        $stmt->bindParam(':profissao_id', $data['profissao_id']);
         $stmt->bindParam(':tipo_usuario', $data['tipo_usuario']);
         $stmt->bindParam(':empresa_id', $data['empresa_id']);
         $stmt->bindParam(':filial_id', $data['filial_id']);
@@ -148,7 +149,7 @@ class User {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['nome', 'email', 'cpf', 'telefone', 'tipo_usuario', 'empresa_id', 'filial_id'];
+        $allowedFields = ['nome', 'email', 'cpf', 'telefone', 'profissao_id', 'tipo_usuario', 'empresa_id', 'filial_id'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {

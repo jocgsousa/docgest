@@ -8,6 +8,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
@@ -95,11 +96,13 @@ const Users = ({ openCreateModal = false }) => {
     cpf: '',
     telefone: '',
     senha: '',
+    profissao_id: '',
     tipo_usuario: 3,
     empresa_id: '',
     filial_id: ''
   });
   const [availableBranches, setAvailableBranches] = useState([]);
+  const [professions, setProfessions] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
     tipo_usuario: '',
@@ -176,6 +179,16 @@ const Users = ({ openCreateModal = false }) => {
     }
   ];
 
+  // Carregar profissões
+  const loadProfessions = async () => {
+    try {
+      const response = await api.get('/professions/all');
+      setProfessions(response.data.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar profissões:', error);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     if (user?.tipo_usuario === 1 && companies.length === 0) {
@@ -183,6 +196,9 @@ const Users = ({ openCreateModal = false }) => {
     }
     if ((user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && branches.length === 0) {
       loadBranches();
+    }
+    if (professions.length === 0) {
+      loadProfessions();
     }
   }, [filters, pagination.page]);
 
@@ -250,6 +266,7 @@ const Users = ({ openCreateModal = false }) => {
       cpf: userToEdit.cpf,
       telefone: userToEdit.telefone,
       senha: '',
+      profissao_id: userToEdit.profissao_id || '',
       tipo_usuario: userToEdit.tipo_usuario,
       empresa_id: userToEdit.empresa_id || '',
       filial_id: userToEdit.filial_id || ''
@@ -275,6 +292,7 @@ const Users = ({ openCreateModal = false }) => {
       cpf: '',
       telefone: '',
       senha: '',
+      profissao_id: '',
       tipo_usuario: 3,
       empresa_id: '',
       filial_id: ''
@@ -381,12 +399,17 @@ const Users = ({ openCreateModal = false }) => {
           columns={columns}
           data={users}
           loading={loading}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: handlePageChange
-          }}
+          emptyMessage="Nenhum usuário encontrado"
+        />
+        
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={Math.ceil(pagination.total / pagination.pageSize)}
+          totalItems={pagination.total}
+          pageSize={pagination.pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={(pageSize) => setPagination(prev => ({ ...prev, pageSize, page: 1 }))}
+          pageSizeOptions={[10, 25, 50, 100]}
         />
       </Card>
 
@@ -433,6 +456,36 @@ const Users = ({ openCreateModal = false }) => {
               error={errors.telefone?.[0]}
               required
             />
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Profissão
+              </label>
+              <select
+                value={formData.profissao_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, profissao_id: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                required
+              >
+                <option value="">Selecione uma profissão</option>
+                {professions.map(profession => (
+                  <option key={profession.id} value={profession.id}>
+                    {profession.nome}
+                  </option>
+                ))}
+              </select>
+              {errors.profissao_id && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.profissao_id[0]}
+                </span>
+              )}
+            </div>
             
             <Input
               label={editingUser ? 'Nova Senha (deixe vazio para manter)' : 'Senha'}

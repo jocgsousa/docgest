@@ -112,6 +112,8 @@ class UserController {
                 ->cpf('cpf', 'CPF deve ser válido')
                 ->unique('cpf', 'usuarios', 'cpf', null, 'Este CPF já está em uso')
                 ->required('telefone', 'Telefone é obrigatório')
+                ->required('profissao_id', 'Profissão é obrigatória')
+                ->exists('profissao_id', 'profissoes', 'id', 'Profissão não encontrada')
                 ->required('tipo_usuario', 'Tipo de usuário é obrigatório')
                 ->in('tipo_usuario', [1, 2, 3], 'Tipo de usuário inválido');
             
@@ -153,6 +155,7 @@ class UserController {
                 'senha' => $input['senha'],
                 'cpf' => preg_replace('/[^0-9]/', '', $input['cpf']),
                 'telefone' => $input['telefone'],
+                'profissao_id' => $input['profissao_id'],
                 'tipo_usuario' => $input['tipo_usuario'],
                 'empresa_id' => $input['empresa_id'] ?? null,
                 'filial_id' => $input['filial_id'] ?? null

@@ -14,7 +14,8 @@ import {
   ClipboardList,
   Store,
   MessageCircle,
-  User
+  User,
+  Briefcase
 } from 'lucide-react';
 
 const SidebarContainer = styled.aside.withConfig({
@@ -219,6 +220,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
             { path: '/empresas', icon: Building2, label: 'Empresas' },
             { path: '/planos', icon: Gem, label: 'Planos' },
             { path: '/usuarios', icon: Users, label: 'Usuários' },
+            { path: '/profissoes', icon: Briefcase, label: 'Profissões' },
             { path: '/configuracoes', icon: Settings, label: 'Configurações' },
           ]
         },

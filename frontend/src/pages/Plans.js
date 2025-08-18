@@ -7,6 +7,7 @@ import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
@@ -352,12 +353,17 @@ const Plans = () => {
           columns={columns}
           data={plans}
           loading={loading}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: handlePageChange
-          }}
+          emptyMessage="Nenhum plano encontrado"
+        />
+        
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={Math.ceil(pagination.total / pagination.pageSize)}
+          totalItems={pagination.total}
+          pageSize={pagination.pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={(pageSize) => setPagination(prev => ({ ...prev, pageSize, page: 1 }))}
+          pageSizeOptions={[10, 25, 50, 100]}
         />
       </Card>
 

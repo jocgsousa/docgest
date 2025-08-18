@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
 import api from '../services/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
@@ -531,14 +533,18 @@ const Documents = () => {
           columns={columns}
           data={documents}
           loading={loading}
-          pagination={{
-            current: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: handlePageChange
-          }}
         />
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={Math.ceil(pagination.total / pagination.pageSize)}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+        onPageSizeChange={(pageSize) => setPagination(prev => ({ ...prev, pageSize, page: 1 }))}
+        pageSizeOptions={[10, 25, 50, 100]}
+      />
 
       <Modal
         isOpen={showModal}

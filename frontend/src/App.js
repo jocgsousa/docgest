@@ -15,6 +15,7 @@ import Branches from './pages/Branches';
 import WhatsApp from './pages/WhatsApp';
 import Profile from './pages/Profile';
 import Usage from './pages/Usage';
+import Professions from './pages/Professions';
 import Layout from './components/layout/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
@@ -194,6 +195,16 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <Companies openCreateModal={true} />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profissoes" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Professions />
                     </Layout>
                   </ProtectedRoute>
                 } 

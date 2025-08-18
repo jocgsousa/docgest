@@ -12,6 +12,7 @@ require_once __DIR__ . '/../controllers/ReportController.php';
 require_once __DIR__ . '/../controllers/SettingsController.php';
 require_once __DIR__ . '/../controllers/LogController.php';
 require_once __DIR__ . '/../controllers/BranchController.php';
+require_once __DIR__ . '/../controllers/ProfessionController.php';
 require_once __DIR__ . '/../utils/Response.php';
 
 // Configurar CORS
@@ -502,6 +503,60 @@ try {
                 case 'DELETE':
                     if ($id === null) {
                         $controller->clear();
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                default:
+                    Response::error('Método não permitido', 405);
+            }
+            break;
+            
+        // Rotas de Profissões
+        case 'professions':
+            $controller = new ProfessionController();
+            
+            switch ($method) {
+                case 'GET':
+                    if ($id === null) {
+                        $controller->index();
+                    } elseif ($id === 'all') {
+                        $controller->listAll();
+                    } elseif ($action === null) {
+                        $controller->show($id);
+                    } elseif ($action === 'count-users') {
+                        $controller->countUsers($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'POST':
+                    if ($id === null) {
+                        $controller->store();
+                    } elseif ($id === 'import') {
+                        $controller->import();
+                    } elseif ($action === 'activate') {
+                        $controller->activate($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'PUT':
+                    if ($id !== null && $action === null) {
+                        $controller->update($id);
+                    } elseif ($id !== null && $action === 'activate') {
+                        $controller->activate($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'DELETE':
+                    if ($id !== null && $action === null) {
+                        $controller->destroy($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }

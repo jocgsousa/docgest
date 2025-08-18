@@ -65,6 +65,18 @@ CREATE TABLE filiais (
 );
 
 -- ================================================
+-- PROFISSÕES
+-- ================================================
+CREATE TABLE profissoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    descricao TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ================================================
 -- USUÁRIOS
 -- ================================================
 CREATE TABLE usuarios (
@@ -74,12 +86,14 @@ CREATE TABLE usuarios (
     senha VARCHAR(255) NOT NULL,
     cpf VARCHAR(14) UNIQUE,
     telefone VARCHAR(20),
+    profissao_id INT,
     tipo_usuario TINYINT NOT NULL COMMENT '1=Super Admin, 2=Admin Empresa, 3=Assinante',
     empresa_id INT,
     filial_id INT,
     ativo BOOLEAN DEFAULT TRUE,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (profissao_id) REFERENCES profissoes(id) ON DELETE SET NULL,
     FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
     FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL
 );
@@ -175,6 +189,21 @@ INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, 
 ('Plano Profissional', 'Para empresas médias', 199.90, 15, 200, 500),
 ('Plano Enterprise', 'Para grandes empresas', 399.90, 50, 1000, 2000);
 
+-- Profissões padrão
+INSERT INTO profissoes (nome, descricao) VALUES
+('Advogado', 'Profissional do direito'),
+('Contador', 'Profissional de contabilidade'),
+('Administrador', 'Profissional de administração'),
+('Engenheiro', 'Profissional de engenharia'),
+('Médico', 'Profissional da medicina'),
+('Arquiteto', 'Profissional de arquitetura'),
+('Consultor', 'Profissional de consultoria'),
+('Analista', 'Profissional de análise'),
+('Gerente', 'Profissional de gestão'),
+('Diretor', 'Profissional de direção'),
+('Empresário', 'Proprietário de empresa'),
+('Outros', 'Outras profissões não listadas');
+
 -- Empresa exemplo
 INSERT INTO empresas (nome, cnpj, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
 ('Empresa Exemplo LTDA', '12.345.678/0001-90', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
@@ -184,10 +213,10 @@ INSERT INTO filiais (empresa_id, nome, endereco, telefone, email) VALUES
 (1, 'Matriz', 'Rua Exemplo, 123', '(11) 99999-0000', 'matriz@exemplo.com');
 
 -- Usuários padrão (senha: 123456)
-INSERT INTO usuarios (nome, email, senha, cpf, telefone, tipo_usuario, empresa_id, filial_id) VALUES
-('Super Admin', 'admin@docgest.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '000.000.000-00', '(11) 99999-0001', 1, NULL, NULL),
-('Admin Empresa', 'admin@exemplo.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '111.111.111-11', '(11) 99999-0002', 2, 1, 1),
-('Usuário Teste', 'usuario@exemplo.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '222.222.222-22', '(11) 99999-0003', 3, 1, 1);
+INSERT INTO usuarios (nome, email, senha, cpf, telefone, profissao_id, tipo_usuario, empresa_id, filial_id) VALUES
+('Super Admin', 'admin@docgest.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '000.000.000-00', '(11) 99999-0001', 3, 1, NULL, NULL),
+('Admin Empresa', 'admin@exemplo.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '111.111.111-11', '(11) 99999-0002', 3, 2, 1, 1),
+('Usuário Teste', 'usuario@exemplo.com', '$2y$10$1qj.4/H4WUQPboyYZm8iMOyQSipR3MKT.LCOAv.mfAVrpT405zEcG', '222.222.222-22', '(11) 99999-0003', 1, 3, 1, 1);
 
 -- Documento exemplo
 INSERT INTO documentos (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, criado_por, empresa_id, filial_id) VALUES
@@ -199,6 +228,9 @@ INSERT INTO documentos (titulo, descricao, nome_arquivo, caminho_arquivo, tamanh
 CREATE INDEX idx_usuarios_email ON usuarios(email);
 CREATE INDEX idx_usuarios_empresa ON usuarios(empresa_id);
 CREATE INDEX idx_usuarios_tipo ON usuarios(tipo_usuario);
+CREATE INDEX idx_usuarios_profissao ON usuarios(profissao_id);
+CREATE INDEX idx_profissoes_nome ON profissoes(nome);
+CREATE INDEX idx_profissoes_ativo ON profissoes(ativo);
 CREATE INDEX idx_empresas_cnpj ON empresas(cnpj);
 CREATE INDEX idx_documentos_empresa ON documentos(empresa_id);
 CREATE INDEX idx_documentos_status ON documentos(status);
@@ -219,6 +251,8 @@ SELECT
     u.email,
     u.cpf,
     u.telefone,
+    u.profissao_id,
+    p.nome as profissao_nome,
     u.tipo_usuario,
     CASE 
         WHEN u.tipo_usuario = 1 THEN 'Super Admin'
@@ -233,6 +267,7 @@ SELECT
     u.ativo,
     u.data_criacao
 FROM usuarios u
+LEFT JOIN profissoes p ON u.profissao_id = p.id
 LEFT JOIN empresas e ON u.empresa_id = e.id
 LEFT JOIN filiais f ON u.filial_id = f.id;
 
