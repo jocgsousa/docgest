@@ -81,7 +81,7 @@ class LogController {
             $validator->required('level', 'Nível é obrigatório');
             $validator->required('message', 'Mensagem é obrigatória');
             $validator->in('level', ['debug', 'info', 'warning', 'error'], 'Nível deve ser: debug, info, warning ou error');
-            $validator->validate();
+
             
             $logData = [
                 'level' => $input['level'],

@@ -102,7 +102,7 @@ class CompanyController {
                 ->required('data_vencimento', 'Data de vencimento é obrigatória')
                 ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
             
-            $validator->validate();
+
             
             // Verificar se CNPJ já existe
             $cnpj = preg_replace('/[^0-9]/', '', $input['cnpj']);
@@ -196,7 +196,7 @@ class CompanyController {
                 }
             }
             
-            $validator->validate();
+
             
             // Verificar unicidade de CNPJ e email
             if (isset($input['cnpj'])) {
@@ -370,7 +370,7 @@ class CompanyController {
                 ->required('data_vencimento', 'Nova data de vencimento é obrigatória')
                 ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
             
-            $validator->validate();
+
             
             // Atualizar data de vencimento
             $renewed = $this->companyModel->updateExpiration($id, $input['data_vencimento']);

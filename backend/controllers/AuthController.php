@@ -30,8 +30,6 @@ class AuthController {
                 ->email('email', 'Email deve ser válido')
                 ->required('senha', 'Senha é obrigatória');
             
-            $validator->validate();
-            
             // Buscar usuário
             $user = $this->userModel->findByEmail($input['email']);
             
@@ -100,7 +98,7 @@ class AuthController {
                          ->exists('filial_id', 'filiais', 'id', 'Filial não encontrada');
             }
             
-            $validator->validate();
+
             
             // Verificar permissões
             $currentUser = JWT::validateToken();
@@ -205,7 +203,7 @@ class AuthController {
                          ->confirmed('senha', 'Confirmação de senha não confere');
             }
             
-            $validator->validate();
+
             
             // Atualizar usuário
             $updateData = [];
@@ -252,7 +250,7 @@ class AuthController {
                 ->min('nova_senha', 6, 'Nova senha deve ter pelo menos 6 caracteres')
                 ->confirmed('nova_senha', 'Confirmação da nova senha não confere');
             
-            $validator->validate();
+
             
             // Buscar usuário
             $user = $this->userModel->findById($currentUser['user_id']);

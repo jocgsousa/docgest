@@ -7,6 +7,7 @@ define('APP_ENV', 'development'); // development, production
 
 // Configurações de CORS
 define('CORS_ALLOWED_ORIGINS', [
+    '*',
     'http://localhost:3000',
     'http://127.0.0.1:3000'
 ]);
@@ -57,7 +58,9 @@ if (APP_ENV === 'development') {
 function setCorsHeaders() {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     
-    if (in_array($origin, CORS_ALLOWED_ORIGINS)) {
+    if (in_array('*', CORS_ALLOWED_ORIGINS)) {
+        header('Access-Control-Allow-Origin: *');
+    } elseif (in_array($origin, CORS_ALLOWED_ORIGINS)) {
         header("Access-Control-Allow-Origin: $origin");
     }
     

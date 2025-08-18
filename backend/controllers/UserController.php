@@ -127,7 +127,7 @@ class UserController {
                          ->exists('filial_id', 'filiais', 'id', 'Filial não encontrada');
             }
             
-            $validator->validate();
+
             
             // Verificar permissões
             // Super admin pode criar qualquer tipo
@@ -238,7 +238,7 @@ class UserController {
                 $validator->exists('filial_id', 'filiais', 'id', 'Filial não encontrada');
             }
             
-            $validator->validate();
+
             
             // Preparar dados para atualização
             $updateData = [];

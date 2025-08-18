@@ -90,7 +90,7 @@ class PlanController {
                 $validator->numeric('preco', 'Preço deve ser um número válido');
             }
             
-            $validator->validate();
+
             
             // Verificar se nome já existe
             if ($this->planModel->nameExists($input['nome'])) {
@@ -176,7 +176,7 @@ class PlanController {
                 $validator->integer('limite_assinaturas', 'Limite de assinaturas deve ser um número inteiro');
             }
             
-            $validator->validate();
+
             
             // Verificar unicidade de nome
             if (isset($input['nome'])) {

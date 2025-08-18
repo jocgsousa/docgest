@@ -108,7 +108,7 @@ class DocumentController {
             $validator->required('empresa_id', 'Empresa é obrigatória');
             $validator->required('assinantes', 'Pelo menos um assinante é obrigatório');
             
-            $validator->validate();
+
             if ($validator->hasErrors()) {
                 Response::validation($validator->getErrors());
                 return;

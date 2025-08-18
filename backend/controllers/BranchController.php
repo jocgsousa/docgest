@@ -144,7 +144,7 @@ class BranchController {
                 $validator->email('email', 'Email inválido');
             }
             
-            $validator->validate();
+
             
             // Verificar permissões
             // Admin de empresa só pode criar filiais da sua empresa
@@ -229,7 +229,7 @@ class BranchController {
                 $validator->email('email', 'Email inválido');
             }
             
-            $validator->validate();
+
             
             // Preparar dados
             $branchData = [
