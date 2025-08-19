@@ -232,7 +232,7 @@ class Signature {
                 FROM {$this->table} a 
                 LEFT JOIN documentos d ON a.documento_id = d.id 
                 LEFT JOIN usuarios u ON a.criado_por = u.id 
-                WHERE {$whereClause} 
+                WHERE " . str_replace('ativo = 1', 'a.ativo = 1', $whereClause) . " 
                 ORDER BY a.data_criacao DESC 
                 LIMIT 5";
         

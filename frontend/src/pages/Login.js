@@ -87,6 +87,29 @@ const ForgotPassword = styled.button`
   }
 `;
 
+const SignupLink = styled.div`
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid ${props => props.theme.colors.gray[200]};
+  
+  p {
+    color: ${props => props.theme.colors.gray[600]};
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  a {
+    color: ${props => props.theme.colors.primary};
+    text-decoration: none;
+    font-weight: 500;
+    
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+`;
+
 const Footer = styled.div`
   margin-top: 2rem;
   text-align: center;
@@ -202,6 +225,11 @@ function Login() {
             Esqueceu sua senha?
           </ForgotPassword>
         </Form>
+        
+        <SignupLink>
+          <p>Não tem uma conta?</p>
+          <a href="/cadastro">Criar conta</a>
+        </SignupLink>
         
         <Footer>
           © 2024 DocGest. Todos os direitos reservados.

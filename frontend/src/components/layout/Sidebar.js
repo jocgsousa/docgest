@@ -15,7 +15,8 @@ import {
   Store,
   MessageCircle,
   User,
-  Briefcase
+  Briefcase,
+  Bell
 } from 'lucide-react';
 
 const SidebarContainer = styled.aside.withConfig({
@@ -221,6 +222,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
             { path: '/planos', icon: Gem, label: 'Planos' },
             { path: '/usuarios', icon: Users, label: 'Usuários' },
             { path: '/profissoes', icon: Briefcase, label: 'Profissões' },
+            { path: '/notificacoes', icon: Bell, label: 'Notificações' },
             { path: '/configuracoes', icon: Settings, label: 'Configurações' },
           ]
         },
@@ -237,6 +239,12 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
             { path: '/relatorios', icon: TrendingUp, label: 'Relatórios' },
             { path: '/logs', icon: ClipboardList, label: 'Logs' },
           ]
+        },
+        {
+          section: 'Conta',
+          items: [
+            { path: '/perfil', icon: User, label: 'Meu Perfil' },
+          ]
         }
       ];
     }
@@ -249,6 +257,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
           items: [
             { path: '/filiais', icon: Store, label: 'Filiais' },
             { path: '/usuarios', icon: Users, label: 'Usuários' },
+            { path: '/notificacoes', icon: Bell, label: 'Notificações' },
             { path: '/whatsapp', icon: MessageCircle, label: 'WhatsApp' },
           ]
         },
@@ -264,6 +273,12 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
           items: [
             { path: '/relatorios', icon: TrendingUp, label: 'Relatórios' },
             { path: '/uso', icon: BarChart3, label: 'Uso Mensal' },
+          ]
+        },
+        {
+          section: 'Conta',
+          items: [
+            { path: '/perfil', icon: User, label: 'Meu Perfil' },
           ]
         }
       ];

@@ -154,6 +154,32 @@ class BranchController {
                 }
             }
             
+            // Verificar limite de filiais do plano
+            require_once __DIR__ . '/../models/Company.php';
+            $companyModel = new Company();
+            $company = $companyModel->findById($input['empresa_id']);
+            
+            if (!$company) {
+                Response::notFound('Empresa não encontrada');
+            }
+            
+            // Buscar informações do plano
+            require_once __DIR__ . '/../models/Plan.php';
+            $planModel = new Plan();
+            $plan = $planModel->findById($company['plano_id']);
+            
+            if (!$plan) {
+                Response::internalError('Plano da empresa não encontrado');
+            }
+            
+            // Contar filiais atuais da empresa
+            $currentBranches = $this->branchModel->countByCompany($input['empresa_id']);
+            
+            // Verificar se não excede o limite (999999 = ilimitado)
+            if ($plan['limite_filiais'] != 999999 && $currentBranches >= $plan['limite_filiais']) {
+                Response::forbidden('Limite de filiais do plano atingido. Limite atual: ' . $plan['limite_filiais'] . ' filiais');
+            }
+            
             // Preparar dados
             $branchData = [
                 'empresa_id' => $input['empresa_id'],

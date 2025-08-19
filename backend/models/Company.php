@@ -367,7 +367,7 @@ class Company {
      * Calcula o uso do plano de uma empresa
      */
     public function getPlanUsage($empresaId) {
-        $sql = "SELECT e.id, e.nome, p.limite_usuarios, p.limite_documentos, p.limite_assinaturas,
+        $sql = "SELECT e.id, e.nome, p.limite_usuarios, p.limite_documentos, p.limite_assinaturas, p.limite_filiais,
                        (SELECT COUNT(*) FROM usuarios WHERE empresa_id = e.id AND ativo = 1) as usuarios_usados,
                        (SELECT COUNT(*) FROM documentos WHERE empresa_id = e.id AND ativo = 1) as documentos_usados,
                        (SELECT COUNT(*) FROM assinaturas WHERE empresa_id = e.id AND ativo = 1) as assinaturas_usadas

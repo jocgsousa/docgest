@@ -205,7 +205,16 @@ function Dashboard() {
       
       // Carregar estatísticas
       const statsResponse = await api.get('/dashboard/stats');
-      setStats(statsResponse.data.data);
+      const statsData = statsResponse.data?.data || statsResponse.data || {};
+      setStats({
+        documentos: statsData.documentos || 0,
+        assinaturas: statsData.assinaturas || 0,
+        usuarios: statsData.usuarios || 0,
+        empresas: statsData.empresas || 0,
+        filiais: statsData.filiais || 0,
+        pendentes: statsData.pendentes || 0,
+        plano: statsData.plano || {}
+      });
       
       // Carregar atividades recentes
       const activitiesResponse = await api.get('/dashboard/activities');
@@ -213,6 +222,16 @@ function Dashboard() {
       
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
+      // Manter valores padrão em caso de erro
+      setStats({
+        documentos: 0,
+        assinaturas: 0,
+        usuarios: 0,
+        empresas: 0,
+        filiais: 0,
+        pendentes: 0,
+        plano: {}
+      });
     } finally {
       setLoading(false);
     }
@@ -226,33 +245,51 @@ function Dashboard() {
   };
   
   const getStatsCards = () => {
+    // Garantir que stats sempre tenha as propriedades necessárias
+    const safeStats = {
+      documentos: stats?.documentos || 0,
+      assinaturas: stats?.assinaturas || 0,
+      usuarios: stats?.usuarios || 0,
+      empresas: stats?.empresas || 0,
+      filiais: stats?.filiais || 0,
+      pendentes: stats?.pendentes || 0,
+      plano: stats?.plano || {}
+    };
+
     if (isAdmin) {
       return [
         {
           icon: Building2,
           color: '#374151',
-          value: stats.empresas,
+          value: safeStats.empresas,
           label: 'Empresas',
           change: '+12%'
         },
         {
+          icon: Store,
+          color: '#374151',
+          value: safeStats.filiais,
+          label: 'Filiais',
+          change: '+10%'
+        },
+        {
           icon: Users,
           color: '#374151',
-          value: stats.usuarios,
+          value: safeStats.usuarios,
           label: 'Usuários',
           change: '+8%'
         },
         {
           icon: FileText,
           color: '#374151',
-          value: stats.documentos,
+          value: safeStats.documentos,
           label: 'Documentos',
           change: '+15%'
         },
         {
           icon: PenTool,
           color: '#374151',
-          value: stats.assinaturas,
+          value: safeStats.assinaturas,
           label: 'Assinaturas',
           change: '+23%'
         }
@@ -260,39 +297,46 @@ function Dashboard() {
     }
     
     if (isCompanyAdmin) {
-      const planUsage = stats.plano || {};
-      const avgUsage = planUsage.percentual_usuarios && planUsage.percentual_documentos && planUsage.percentual_assinaturas
-        ? Math.round((planUsage.percentual_usuarios + planUsage.percentual_documentos + planUsage.percentual_assinaturas) / 3)
+      const planUsage = safeStats.plano || {};
+      const avgUsage = planUsage.percentual_usuarios && planUsage.percentual_documentos && planUsage.percentual_assinaturas && planUsage.percentual_filiais
+        ? Math.round((planUsage.percentual_usuarios + planUsage.percentual_documentos + planUsage.percentual_assinaturas + planUsage.percentual_filiais) / 4)
         : 0;
       
       return [
         {
           icon: Users,
           color: '#374151',
-          value: `${stats.usuarios}/${planUsage.limite_usuarios || 0}`,
+          value: `${safeStats.usuarios}/${planUsage.limite_usuarios || 0}`,
           label: 'Usuários',
           change: `${planUsage.percentual_usuarios || 0}%`
         },
         {
+          icon: Store,
+          color: '#374151',
+          value: `${safeStats.filiais}/${planUsage.limite_filiais === 999999 ? '∞' : planUsage.limite_filiais || 1}`,
+          label: 'Filiais',
+          change: `${planUsage.percentual_filiais || 0}%`
+        },
+        {
           icon: FileText,
           color: '#374151',
-          value: `${stats.documentos}/${planUsage.limite_documentos || 0}`,
+          value: `${safeStats.documentos}/${planUsage.limite_documentos || 0}`,
           label: 'Documentos',
           change: `${planUsage.percentual_documentos || 0}%`
         },
         {
           icon: PenTool,
           color: '#374151',
-          value: `${stats.assinaturas}/${planUsage.limite_assinaturas || 0}`,
+          value: `${safeStats.assinaturas}/${planUsage.limite_assinaturas || 0}`,
           label: 'Assinaturas',
           change: `${planUsage.percentual_assinaturas || 0}%`
         },
         {
-          icon: BarChart3,
+          icon: Clock,
           color: '#374151',
-          value: `${avgUsage}%`,
-          label: 'Uso do Plano',
-          change: avgUsage > 80 ? 'Alto' : avgUsage > 50 ? 'Médio' : 'Baixo'
+          value: safeStats.pendentes,
+          label: 'Pendentes',
+          change: `${avgUsage}% uso médio`
         }
       ];
     }
@@ -302,21 +346,21 @@ function Dashboard() {
       {
         icon: FileText,
         color: '#374151',
-        value: stats.documentos,
+        value: safeStats.documentos,
         label: 'Meus Documentos',
         change: '+12%'
       },
       {
         icon: PenTool,
         color: '#374151',
-        value: stats.assinaturas,
+        value: safeStats.assinaturas,
         label: 'Assinaturas',
         change: '+20%'
       },
       {
         icon: Clock,
         color: '#374151',
-        value: stats.pendentes || 0,
+        value: safeStats.pendentes,
         label: 'Pendentes',
         change: '-5%'
       }

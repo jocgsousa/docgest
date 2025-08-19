@@ -228,6 +228,33 @@ class Branch {
         
         return $stmt->fetchAll();
     }
+    
+    /**
+     * Conta o número total de filiais ativas
+     */
+    public function count() {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE ativo = 1";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        
+        $result = $stmt->fetch();
+        return $result ? (int)$result['total'] : 0;
+    }
+    
+    /**
+     * Conta o número de filiais de uma empresa
+     */
+    public function countByCompany($empresaId) {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE empresa_id = :empresa_id AND ativo = 1";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':empresa_id', $empresaId);
+        $stmt->execute();
+        
+        $result = $stmt->fetch();
+        return $result ? (int)$result['total'] : 0;
+    }
 }
 
 ?>

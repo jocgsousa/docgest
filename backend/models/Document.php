@@ -35,17 +35,34 @@ class Document {
     }
     
     public function findById($id) {
-        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome 
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome 
                 FROM {$this->table} d 
                 LEFT JOIN usuarios u ON d.criado_por = u.id 
                 LEFT JOIN empresas e ON d.empresa_id = e.id 
+                LEFT JOIN filiais f ON d.filial_id = f.id 
                 WHERE d.id = :id AND d.ativo = 1";
         
         $stmt = $this->db->prepare($sql);
         $stmt->bindParam(':id', $id);
         $stmt->execute();
         
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $document = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($document) {
+            // Buscar assinantes do documento
+            $assinantesSql = "SELECT da.usuario_id, u.nome, u.email 
+                             FROM documento_assinantes da 
+                             LEFT JOIN usuarios u ON da.usuario_id = u.id 
+                             WHERE da.documento_id = :documento_id AND da.ativo = 1";
+            
+            $assinantesStmt = $this->db->prepare($assinantesSql);
+            $assinantesStmt->bindParam(':documento_id', $id);
+            $assinantesStmt->execute();
+            
+            $document['assinantes'] = $assinantesStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $document;
     }
     
     public function findAll($filters = [], $page = 1, $pageSize = 10) {
@@ -119,7 +136,7 @@ class Document {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status'];
+        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'empresa_id', 'filial_id'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
@@ -241,21 +258,21 @@ class Document {
      }
      
      public function getStats($filters = []) {
-        $conditions = ['ativo = 1'];
+        $conditions = ['d.ativo = 1'];
         $params = [];
         
         if (!empty($filters['empresa_id'])) {
-            $conditions[] = 'empresa_id = :empresa_id';
+            $conditions[] = 'd.empresa_id = :empresa_id';
             $params[':empresa_id'] = $filters['empresa_id'];
         }
         
         if (!empty($filters['filial_id'])) {
-            $conditions[] = 'filial_id = :filial_id';
+            $conditions[] = 'd.filial_id = :filial_id';
             $params[':filial_id'] = $filters['filial_id'];
         }
         
         if (!empty($filters['criado_por'])) {
-            $conditions[] = 'criado_por = :criado_por';
+            $conditions[] = 'd.criado_por = :criado_por';
             $params[':criado_por'] = $filters['criado_por'];
         }
         
@@ -264,12 +281,12 @@ class Document {
         // Estatísticas gerais
         $sql = "SELECT 
                     COUNT(*) as total_documentos,
-                    COUNT(CASE WHEN status = 'rascunho' THEN 1 END) as rascunhos,
-                    COUNT(CASE WHEN status = 'enviado' THEN 1 END) as enviados,
-                    COUNT(CASE WHEN status = 'assinado' THEN 1 END) as assinados,
-                    COUNT(CASE WHEN status = 'cancelado' THEN 1 END) as cancelados,
-                    SUM(tamanho_arquivo) as tamanho_total
-                FROM {$this->table} 
+                    COUNT(CASE WHEN d.status = 'rascunho' THEN 1 END) as rascunhos,
+                    COUNT(CASE WHEN d.status = 'enviado' THEN 1 END) as enviados,
+                    COUNT(CASE WHEN d.status = 'assinado' THEN 1 END) as assinados,
+                    COUNT(CASE WHEN d.status = 'cancelado' THEN 1 END) as cancelados,
+                    SUM(d.tamanho_arquivo) as tamanho_total
+                FROM {$this->table} d 
                 WHERE {$whereClause}";
         
         $stmt = $this->db->prepare($sql);
@@ -280,10 +297,10 @@ class Document {
         $geral = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Estatísticas por status
-        $sql = "SELECT status, COUNT(*) as total 
-                FROM {$this->table} 
+        $sql = "SELECT d.status, COUNT(*) as total 
+                FROM {$this->table} d 
                 WHERE {$whereClause} 
-                GROUP BY status";
+                GROUP BY d.status";
         
         $stmt = $this->db->prepare($sql);
         foreach ($params as $key => $value) {

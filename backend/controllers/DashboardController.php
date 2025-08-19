@@ -3,7 +3,9 @@
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/Company.php';
 require_once __DIR__ . '/../models/Document.php';
+require_once __DIR__ . '/../models/DocumentAssinante.php';
 require_once __DIR__ . '/../models/Signature.php';
+require_once __DIR__ . '/../models/Branch.php';
 require_once __DIR__ . '/../utils/JWT.php';
 require_once __DIR__ . '/../utils/Response.php';
 
@@ -11,13 +13,17 @@ class DashboardController {
     private $userModel;
     private $companyModel;
     private $documentModel;
+    private $documentAssinanteModel;
     private $signatureModel;
+    private $branchModel;
     
     public function __construct() {
         $this->userModel = new User();
         $this->companyModel = new Company();
         $this->documentModel = new Document();
+        $this->documentAssinanteModel = new DocumentAssinante();
         $this->signatureModel = new Signature();
+        $this->branchModel = new Branch();
     }
     
     /**
@@ -34,6 +40,7 @@ class DashboardController {
                 $stats = [
                     'usuarios' => $this->userModel->count(),
                     'empresas' => $this->companyModel->count(),
+                    'filiais' => $this->branchModel->count(),
                     'documentos' => $this->documentModel->count(),
                     'assinaturas' => $this->signatureModel->count(),
                     'pendentes' => $this->signatureModel->countPending(),
@@ -43,9 +50,11 @@ class DashboardController {
             } elseif ($currentUser['tipo_usuario'] == 2) {
                 // Admin da Empresa - estatísticas da empresa
                 $planUsage = $this->companyModel->getPlanUsage($currentUser['empresa_id']);
+                $filiaisUsadas = $this->branchModel->countByCompany($currentUser['empresa_id']);
                 
                 $stats = [
                     'usuarios' => $this->userModel->countByCompany($currentUser['empresa_id']),
+                    'filiais' => $filiaisUsadas,
                     'documentos' => $this->documentModel->countByCompany($currentUser['empresa_id']),
                     'assinaturas' => $this->signatureModel->countByCompany($currentUser['empresa_id']),
                     'pendentes' => $this->signatureModel->countPendingByCompany($currentUser['empresa_id']),
@@ -53,20 +62,31 @@ class DashboardController {
                         'limite_usuarios' => $planUsage['limite_usuarios'] ?? 0,
                         'limite_documentos' => $planUsage['limite_documentos'] ?? 0,
                         'limite_assinaturas' => $planUsage['limite_assinaturas'] ?? 0,
+                        'limite_filiais' => $planUsage['limite_filiais'] ?? 1,
                         'usuarios_usados' => $planUsage['usuarios_usados'] ?? 0,
                         'documentos_usados' => $planUsage['documentos_usados'] ?? 0,
                         'assinaturas_usadas' => $planUsage['assinaturas_usadas'] ?? 0,
+                        'filiais_usadas' => $filiaisUsadas,
                         'percentual_usuarios' => $planUsage['percentual_usuarios'] ?? 0,
                         'percentual_documentos' => $planUsage['percentual_documentos'] ?? 0,
-                        'percentual_assinaturas' => $planUsage['percentual_assinaturas'] ?? 0
+                        'percentual_assinaturas' => $planUsage['percentual_assinaturas'] ?? 0,
+                        'percentual_filiais' => $planUsage['limite_filiais'] > 0 && $planUsage['limite_filiais'] != 999999 ? round(($filiaisUsadas / $planUsage['limite_filiais']) * 100, 2) : 0
                     ]
                 ];
             } else {
                 // Assinante - estatísticas pessoais
+                // Contar documentos criados pelo usuário + documentos onde ele é assinante
+                $documentosCriados = $this->documentModel->countByUser($currentUser['user_id']);
+                $documentosAssinante = $this->documentAssinanteModel->countByUser($currentUser['user_id']);
+                
+                // Contar pendentes: assinaturas pendentes criadas pelo usuário + documentos pendentes onde ele é assinante
+                $assinaturasPendentes = $this->signatureModel->countPendingByUser($currentUser['user_id']);
+                $documentosPendentes = $this->documentAssinanteModel->countPendingByUser($currentUser['user_id']);
+                
                 $stats = [
-                    'documentos' => $this->documentModel->countByUser($currentUser['id']),
-                    'assinaturas' => $this->signatureModel->countByUser($currentUser['id']),
-                    'pendentes' => $this->signatureModel->countPendingByUser($currentUser['id'])
+                    'documentos' => $documentosCriados + $documentosAssinante,
+                    'assinaturas' => $this->signatureModel->countByUser($currentUser['user_id']),
+                    'pendentes' => $assinaturasPendentes + $documentosPendentes
                 ];
             }
             
@@ -94,7 +114,7 @@ class DashboardController {
                 $activities = $this->getCompanyActivities($currentUser['empresa_id']);
             } else {
                 // Assinante - atividades pessoais
-                $activities = $this->getUserActivities($currentUser['id']);
+                $activities = $this->getUserActivities($currentUser['user_id']);
             }
             
             Response::success($activities, 'Atividades recuperadas com sucesso');

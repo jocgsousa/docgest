@@ -13,6 +13,7 @@ require_once __DIR__ . '/../controllers/SettingsController.php';
 require_once __DIR__ . '/../controllers/LogController.php';
 require_once __DIR__ . '/../controllers/BranchController.php';
 require_once __DIR__ . '/../controllers/ProfessionController.php';
+require_once __DIR__ . '/../controllers/NotificationController.php';
 require_once __DIR__ . '/../utils/Response.php';
 
 // Configurar CORS
@@ -135,6 +136,54 @@ try {
                 case 'DELETE':
                     if ($id !== null && $action === null) {
                         $controller->destroy($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                default:
+                    Response::error('Método não permitido', 405);
+            }
+            break;
+            
+        // Rotas de Notificações
+        case 'notifications':
+            $controller = new NotificationController();
+            
+            switch ($method) {
+                case 'GET':
+                    if ($id === null) {
+                        $controller->index();
+                    } elseif ($id === 'unread-count') {
+                        $controller->unreadCount();
+                    } elseif ($action === null) {
+                        $controller->show($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'POST':
+                    if ($id === null) {
+                        $controller->create();
+                    } elseif ($id === 'mark-all-read') {
+                        $controller->markAllAsRead();
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'PUT':
+                    if ($id !== null && $action === 'mark-read') {
+                        $controller->markAsRead($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'DELETE':
+                    if ($id !== null && $action === null) {
+                        $controller->delete($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -309,6 +358,8 @@ try {
                         $controller->index();
                     } elseif ($id === 'stats') {
                         $controller->stats();
+                    } elseif ($id === 'select') {
+                        $controller->select();
                     } elseif ($action === null) {
                         $controller->show($id);
                     } elseif ($action === 'download') {
@@ -590,6 +641,34 @@ try {
                     
                 default:
                     Response::error('Método não permitido', 405);
+            }
+            break;
+            
+        // Rotas Públicas
+        case 'public':
+            $publicResource = $id ?? '';
+            $publicId = $action ?? null;
+            
+            switch ($publicResource) {
+                case 'plans':
+                    $controller = new PlanController();
+                    
+                    switch ($method) {
+                        case 'GET':
+                            if ($publicId === null) {
+                                $controller->publicIndex();
+                            } else {
+                                $controller->publicShow($publicId);
+                            }
+                            break;
+                            
+                        default:
+                            Response::error('Método não permitido', 405);
+                    }
+                    break;
+                    
+                default:
+                    Response::notFound('Recurso público não encontrado');
             }
             break;
             

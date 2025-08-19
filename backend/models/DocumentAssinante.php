@@ -135,9 +135,43 @@ class DocumentAssinante {
     }
     
     public function deleteByDocumentId($documento_id) {
-        $sql = "UPDATE {$this->table} SET ativo = 0 WHERE documento_id = :documento_id";
+        $sql = "DELETE FROM {$this->table} WHERE documento_id = :documento_id";
         $stmt = $this->db->prepare($sql);
         $stmt->bindParam(':documento_id', $documento_id);
         return $stmt->execute();
+    }
+    
+    /**
+     * Conta documentos onde o usuário é assinante
+     */
+    public function countByUser($userId) {
+        $sql = "SELECT COUNT(DISTINCT da.documento_id) as total 
+                FROM {$this->table} da 
+                LEFT JOIN documentos d ON da.documento_id = d.id 
+                WHERE da.usuario_id = :usuario_id AND da.ativo = 1 AND d.ativo = 1";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':usuario_id', $userId);
+        $stmt->execute();
+        
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['total'];
+    }
+    
+    /**
+     * Conta documentos pendentes onde o usuário é assinante
+     */
+    public function countPendingByUser($userId) {
+        $sql = "SELECT COUNT(DISTINCT da.documento_id) as total 
+                FROM {$this->table} da 
+                LEFT JOIN documentos d ON da.documento_id = d.id 
+                WHERE da.usuario_id = :usuario_id AND da.status = 'pendente' AND da.ativo = 1 AND d.ativo = 1";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':usuario_id', $userId);
+        $stmt->execute();
+        
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['total'];
     }
 }

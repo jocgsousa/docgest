@@ -15,6 +15,7 @@ CREATE TABLE planos (
     limite_usuarios INT NOT NULL,
     limite_documentos INT NOT NULL,
     limite_assinaturas INT NOT NULL,
+    limite_filiais INT NOT NULL DEFAULT 1,
     ativo BOOLEAN DEFAULT TRUE,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -184,10 +185,11 @@ CREATE TABLE documento_assinantes (
 -- ================================================
 
 -- Planos padrão
-INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas) VALUES
-('Plano Básico', 'Ideal para pequenas empresas', 99.90, 5, 50, 100),
-('Plano Profissional', 'Para empresas médias', 199.90, 15, 200, 500),
-('Plano Enterprise', 'Para grandes empresas', 399.90, 50, 1000, 2000);
+INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas, limite_filiais) VALUES
+('Plano Trial 5 Dias', 'Ideal para testes', 0, 5, 10, 10, 1),
+('Plano Básico', 'Ideal para pequenas empresas', 99.90, 5, 50, 100, 2),
+('Plano Profissional', 'Para empresas médias', 199.90, 15, 200, 500, 5),
+('Plano Enterprise', 'Para grandes empresas', 399.90, 50, 1000, 2000, 999999);
 
 -- Profissões padrão
 INSERT INTO profissoes (nome, descricao) VALUES
@@ -206,11 +208,11 @@ INSERT INTO profissoes (nome, descricao) VALUES
 
 -- Empresa exemplo
 INSERT INTO empresas (nome, cnpj, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
-('Empresa Exemplo LTDA', '12.345.678/0001-90', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
+('Empresa Exemplo LTDA', '95264309000103', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
 
 -- Filial exemplo
-INSERT INTO filiais (empresa_id, nome, endereco, telefone, email) VALUES
-(1, 'Matriz', 'Rua Exemplo, 123', '(11) 99999-0000', 'matriz@exemplo.com');
+INSERT INTO filiais (empresa_id, nome, cnpj, inscricao_estadual, endereco, cidade, estado, cep, telefone, email, responsavel, observacoes) VALUES
+(1, 'Matriz', '95264309000103', '1234567', 'Rua Exemplo, 123', 'São Paulo', 'SP', '68500300', '(11) 99999-0000', 'matriz@exemplo.com', 'Teste Responsavel', 'Teste Observacoes');
 
 -- Usuários padrão (senha: 123456)
 INSERT INTO usuarios (nome, email, senha, cpf, telefone, profissao_id, tipo_usuario, empresa_id, filial_id) VALUES
@@ -351,6 +353,33 @@ BEGIN
 END//
 
 DELIMITER ;
+
+-- ================================================
+-- NOTIFICAÇÕES
+-- ================================================
+CREATE TABLE notificacoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(200) NOT NULL,
+    mensagem TEXT NOT NULL,
+    tipo ENUM('info','success','warning','error') DEFAULT 'info',
+    usuario_destinatario_id INT NOT NULL,
+    usuario_remetente_id INT,
+    empresa_id INT,
+    lida BOOLEAN DEFAULT FALSE,
+    data_leitura DATETIME,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_destinatario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_remetente_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+);
+
+-- Índices para performance das notificações
+CREATE INDEX idx_notificacoes_destinatario ON notificacoes(usuario_destinatario_id);
+CREATE INDEX idx_notificacoes_empresa ON notificacoes(empresa_id);
+CREATE INDEX idx_notificacoes_lida ON notificacoes(lida);
+CREATE INDEX idx_notificacoes_tipo ON notificacoes(tipo);
 
 -- ================================================
 -- COMENTÁRIOS FINAIS

@@ -8,15 +8,19 @@ const StyledButton = styled.button`
   gap: 8px;
   padding: ${props => {
     switch (props.size) {
-      case 'small': return '6px 12px';
-      case 'large': return '12px 24px';
+      case 'small':
+      case 'sm': return '6px 12px';
+      case 'large':
+      case 'lg': return '12px 24px';
       default: return '8px 16px';
     }
   }};
   font-size: ${props => {
     switch (props.size) {
-      case 'small': return '14px';
-      case 'large': return '16px';
+      case 'small':
+      case 'sm': return '14px';
+      case 'large':
+      case 'lg': return '16px';
       default: return '14px';
     }
   }};
@@ -28,11 +32,15 @@ const StyledButton = styled.button`
   text-decoration: none;
   min-height: ${props => {
     switch (props.size) {
-      case 'small': return '32px';
-      case 'large': return '44px';
+      case 'small':
+      case 'sm': return '32px';
+      case 'large':
+      case 'lg': return '44px';
       default: return '36px';
     }
   }};
+  
+  width: ${props => props.$fullWidth ? '100%' : 'auto'};
 
   &:disabled {
     opacity: 0.6;
@@ -115,6 +123,28 @@ const StyledButton = styled.button`
           
           &:hover:not(:disabled) {
             background: #ebf8ff;
+          }
+        `;
+      case 'white':
+        return `
+          background: white;
+          border-color: white;
+          color: #1a202c;
+          
+          &:hover:not(:disabled) {
+            background: #f7fafc;
+            border-color: #f7fafc;
+          }
+        `;
+      case 'outline-white':
+        return `
+          background: transparent;
+          border-color: white;
+          color: white;
+          
+          &:hover:not(:disabled) {
+            background: white;
+            color: #1a202c;
           }
         `;
       default:

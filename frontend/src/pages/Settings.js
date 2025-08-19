@@ -5,6 +5,7 @@ import api from '../services/api';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Input from '../components/Input';
+import NotificationManager from '../components/NotificationManager';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -198,8 +199,9 @@ const Settings = () => {
   };
 
   const canManageSettings = user?.tipo_usuario === 1; // Apenas Super Admin
+  const canManageNotifications = user?.tipo_usuario === 1 || user?.tipo_usuario === 2; // Super Admin ou Admin Empresa
 
-  if (!canManageSettings) {
+  if (!canManageSettings && !canManageNotifications) {
     return (
       <PageContainer>
         <PageHeader>
@@ -424,9 +426,18 @@ const Settings = () => {
             disabled={loading}
           />
         </SettingsSection>
+
+        {/* Gerenciamento de Notificações */}
+        {canManageNotifications && (
+          <SettingsSection>
+            <SectionTitle>Gerenciamento de Notificações</SectionTitle>
+            <NotificationManager />
+          </SettingsSection>
+        )}
       </SettingsGrid>
 
-      <ButtonGroup>
+      {canManageSettings && (
+        <ButtonGroup>
         <Button $variant="outline" onClick={handleReset} disabled={loading || saving}>
           Restaurar Padrão
         </Button>
@@ -434,6 +445,7 @@ const Settings = () => {
           {saving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </ButtonGroup>
+      )}
     </PageContainer>
   );
 };

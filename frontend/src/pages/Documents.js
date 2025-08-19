@@ -136,13 +136,14 @@ const Documents = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingDocument, setEditingDocument] = useState(null);
-  const [formData, setFormData] = useState({
-    titulo: '',
-    descricao: '',
-    arquivo: null,
-    empresa_id: '',
-    filial_id: '',
-    assinantes: []
+  const [formData, setFormData] = useState({ 
+    titulo: '', 
+    descricao: '', 
+    arquivo: null, 
+    empresa_id: '', 
+    filial_id: '', 
+    assinantes: [],
+    status: 'rascunho'
   });
   const [filters, setFilters] = useState({
     search: '',
@@ -368,6 +369,9 @@ const Documents = () => {
       if (formData.assinantes && formData.assinantes.length > 0) {
         submitData.append('assinantes', JSON.stringify(formData.assinantes));
       }
+      if (formData.status) {
+        submitData.append('status', formData.status);
+      }
 
       if (editingDocument) {
         await api.put(`/documents/${editingDocument.id}`, submitData, {
@@ -397,14 +401,47 @@ const Documents = () => {
     }
   };
 
-  const handleEdit = (documentToEdit) => {
-    setEditingDocument(documentToEdit);
-    setFormData({
-      titulo: documentToEdit.titulo,
-      descricao: documentToEdit.descricao || '',
-      arquivo: null
-    });
-    setShowModal(true);
+  const handleEdit = async (documentToEdit) => {
+    try {
+      // Buscar dados completos do documento
+      const response = await api.get(`/documents/${documentToEdit.id}`);
+      const fullDocument = response.data.data;
+      
+      setEditingDocument(fullDocument);
+      
+      // Carregar empresas se necessário
+      if (companies.length === 0) {
+        await loadCompanies();
+      }
+      
+      // Carregar filiais se há empresa selecionada
+      if (fullDocument.empresa_id) {
+        await loadBranches(fullDocument.empresa_id);
+      }
+      
+      // Carregar usuários se há empresa selecionada
+      if (fullDocument.empresa_id) {
+        await loadUsers(fullDocument.empresa_id, fullDocument.filial_id);
+      }
+      
+      // Extrair IDs dos assinantes
+      const assinantesIds = fullDocument.assinantes ? fullDocument.assinantes.map(a => a.usuario_id) : [];
+      
+      setFormData({
+        titulo: fullDocument.titulo,
+        descricao: fullDocument.descricao || '',
+        arquivo: null,
+        empresa_id: fullDocument.empresa_id || '',
+        filial_id: fullDocument.filial_id || '',
+        assinantes: assinantesIds,
+        status: fullDocument.status || 'rascunho'
+      });
+      
+      setShowModal(true);
+    } catch (error) {
+      console.error('Erro ao carregar dados do documento:', error);
+      alert('Erro ao carregar dados do documento');
+    }
   };
 
   const handleView = (document) => {
@@ -436,7 +473,8 @@ const Documents = () => {
       arquivo: null, 
       empresa_id: '', 
       filial_id: '', 
-      assinantes: [] 
+      assinantes: [],
+      status: 'rascunho'
     });
     setErrors({});
   };
@@ -724,6 +762,38 @@ const Documents = () => {
               )}
             </div>
           </FormRow>
+
+          {/* Campo de Status - apenas para Admin e Super Admin */}
+          {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
+            <FormRow>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="rascunho">Rascunho</option>
+                  <option value="enviado">Enviado</option>
+                  <option value="assinado">Assinado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+                {errors.status && (
+                  <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                    {errors.status[0]}
+                  </span>
+                )}
+              </div>
+            </FormRow>
+          )}
 
           <FormRow>
             <div>

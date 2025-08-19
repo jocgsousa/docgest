@@ -312,6 +312,68 @@ class PlanController {
             Response::handleException($e);
         }
     }
+    
+    /**
+     * Lista planos públicos (sem autenticação)
+     */
+    public function publicIndex() {
+        try {
+            // Buscar apenas planos ativos e visíveis publicamente
+            $filters = ['status' => 'ativo'];
+            $result = $this->planModel->list($filters, 1, 100); // Sem paginação para uso público
+            
+            // Remover informações sensíveis dos planos
+            $publicPlans = array_map(function($plan) {
+                return [
+                    'id' => $plan['id'],
+                    'nome' => $plan['nome'],
+                    'descricao' => $plan['descricao'] ?? '',
+                    'preco' => $plan['preco'] ?? null,
+                    'limite_usuarios' => $plan['limite_usuarios'],
+                    'limite_documentos' => $plan['limite_documentos'],
+                    'limite_assinaturas' => $plan['limite_assinaturas'],
+                    'limite_filiais' => $plan['limite_filiais'],
+                    'recursos' => $plan['recursos'] ?? null
+                ];
+            }, $result['data']);
+            
+            Response::success($publicPlans, 'Planos públicos recuperados com sucesso');
+            
+        } catch (Exception $e) {
+            Response::handleException($e);
+        }
+    }
+    
+    /**
+     * Busca plano público por ID (sem autenticação)
+     */
+    public function publicShow($id) {
+        try {
+            $plan = $this->planModel->findById($id);
+            
+            if (!$plan || $plan['status'] !== 'ativo') {
+                Response::notFound('Plano não encontrado ou não disponível');
+            }
+            
+            // Remover informações sensíveis
+            $publicPlan = [
+                'id' => $plan['id'],
+                'nome' => $plan['nome'],
+                'descricao' => $plan['descricao'] ?? '',
+                'preco' => $plan['preco'] ?? null,
+                'limite_usuarios' => $plan['limite_usuarios'],
+                'limite_documentos' => $plan['limite_documentos'],
+                'limite_assinaturas' => $plan['limite_assinaturas'],
+                'limite_filiais' => $plan['limite_filiais'],
+                'recursos' => $plan['recursos'] ?? null
+            ];
+            
+            Response::success($publicPlan, 'Plano público recuperado com sucesso');
+            
+        } catch (Exception $e) {
+            Response::handleException($e);
+        }
+    }
 }
 
 ?>

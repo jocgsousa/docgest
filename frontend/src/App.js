@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Documents from './pages/Documents';
 import Users from './pages/Users';
 import Companies from './pages/Companies';
-import Documents from './pages/Documents';
+import Professions from './pages/Professions';
 import Signatures from './pages/Signatures';
 import Plans from './pages/Plans';
 import Reports from './pages/Reports';
@@ -15,7 +16,15 @@ import Branches from './pages/Branches';
 import WhatsApp from './pages/WhatsApp';
 import Profile from './pages/Profile';
 import Usage from './pages/Usage';
-import Professions from './pages/Professions';
+import Notifications from './pages/Notifications';
+
+// Landing Page e páginas públicas
+import LandingPage from './pages/LandingPage';
+import Cadastro from './pages/Cadastro';
+import RecuperarSenha from './pages/RecuperarSenha';
+import Sobre from './pages/Sobre';
+import PlanosPage from './pages/Planos';
+import Contato from './pages/Contato';
 import Layout from './components/layout/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
@@ -131,6 +140,8 @@ function App() {
            <Router>
              <AppContainer>
                <Routes>
+              {/* Páginas públicas */}
+              <Route path="/" element={<LandingPage />} />
               <Route 
                 path="/login" 
                 element={
@@ -139,6 +150,27 @@ function App() {
                   </PublicRoute>
                 } 
               />
+              <Route 
+                path="/cadastro" 
+                element={
+                  <PublicRoute>
+                    <Cadastro />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/recuperar-senha" 
+                element={
+                  <PublicRoute>
+                    <RecuperarSenha />
+                  </PublicRoute>
+                } 
+              />
+              <Route path="/sobre" element={<Sobre />} />
+              <Route path="/planos-public" element={<PlanosPage />} />
+              <Route path="/contato" element={<Contato />} />
+              
+              {/* Páginas protegidas */}
               <Route 
                 path="/dashboard" 
                 element={
@@ -284,7 +316,14 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-              <Route path="/" element={<Navigate to="/dashboard" />} />
+            <Route path="/notificacoes" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Notifications />
+                </Layout>
+              </ProtectedRoute>
+            } />
+
             </Routes>
              </AppContainer>
            </Router>

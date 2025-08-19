@@ -37,4 +37,13 @@ api.interceptors.response.use(
   }
 );
 
+// Serviços públicos (sem autenticação)
+export const publicApi = {
+  // Buscar planos públicos
+  getPublicPlans: () => api.get('/public/plans'),
+  
+  // Buscar plano público por ID
+  getPublicPlan: (id) => api.get(`/public/plans/${id}`)
+};
+
 export default api;
