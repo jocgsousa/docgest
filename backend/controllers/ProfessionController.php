@@ -240,11 +240,7 @@ class ProfessionController {
             $currentUser = JWT::requireAdmin();
             
             // Buscar profissão (incluindo inativas)
-            $sql = "SELECT * FROM profissoes WHERE id = :id";
-            $stmt = $this->professionModel->conn->prepare($sql);
-            $stmt->bindParam(':id', $id);
-            $stmt->execute();
-            $profession = $stmt->fetch();
+            $profession = $this->professionModel->findByIdIncludeInactive($id);
             
             if (!$profession) {
                 Response::notFound('Profissão não encontrada');

@@ -41,7 +41,7 @@ class Profession {
      * Lista profissões com filtros
      */
     public function list($filters = [], $page = 1, $pageSize = 20) {
-        $where = ['ativo = 1'];
+        $where = [];
         $params = [];
         
         // Filtros
@@ -53,12 +53,15 @@ class Profession {
         if (isset($filters['ativo'])) {
             $where[] = 'ativo = :ativo';
             $params[':ativo'] = $filters['ativo'];
+        } else {
+            // Se não especificado, mostrar apenas ativos por padrão
+            $where[] = 'ativo = 1';
         }
         
-        $whereClause = implode(' AND ', $where);
+        $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
         
         // Contar total
-        $countSql = "SELECT COUNT(*) FROM {$this->table} WHERE {$whereClause}";
+        $countSql = "SELECT COUNT(*) FROM {$this->table} {$whereClause}";
         $countStmt = $this->conn->prepare($countSql);
         $countStmt->execute($params);
         $total = $countStmt->fetchColumn();
@@ -66,7 +69,7 @@ class Profession {
         // Buscar dados
         $offset = ($page - 1) * $pageSize;
         $sql = "SELECT * FROM {$this->table} 
-                WHERE {$whereClause}
+                {$whereClause}
                 ORDER BY nome ASC
                 LIMIT :offset, :pageSize";
         
@@ -185,6 +188,19 @@ class Profession {
         return $stmt->execute();
     }
     
+    /**
+     * Busca profissão por ID incluindo inativas
+     */
+    public function findByIdIncludeInactive($id) {
+        $sql = "SELECT * FROM {$this->table} WHERE id = :id";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+        
+        return $stmt->fetch();
+    }
+
     /**
      * Ativa uma profissão
      */
