@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../Button';
 import { Menu, X } from 'lucide-react';
+import { useApp } from '../../contexts/AppContext';
 
 const HeaderContainer = styled.header`
   background-color: ${props => props.theme.colors.white};
@@ -149,6 +150,7 @@ const MobileButtonContainer = styled.div`
 
 function LandingHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { appInfo } = useApp();
   const navigate = useNavigate();
 
   const toggleMobileMenu = () => {
@@ -168,7 +170,7 @@ function LandingHeader() {
       <LeftSection>
         <LogoContainer to="/">
           <Logo>D</Logo>
-          <LogoText>DocGest</LogoText>
+          <LogoText>{appInfo?.app_name || 'DocGest'}</LogoText>
         </LogoContainer>
         
         <Navigation>

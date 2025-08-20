@@ -1,6 +1,6 @@
 {
-  "short_name": "DocGest",
-  "name": "DocGest - Sistema de Gestão de Documentos",
+  "short_name": "Sistema de Documentos",
+  "name": "Sistema de Gestão de Documentos",
   "icons": [
     {
       "src": "favicon.ico",

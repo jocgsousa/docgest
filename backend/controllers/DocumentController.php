@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/Document.php';
 require_once __DIR__ . '/../models/DocumentAssinante.php';
+require_once __DIR__ . '/../models/Settings.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/../utils/JWT.php';
@@ -15,6 +16,63 @@ class DocumentController {
         $this->document = new Document();
         $this->documentAssinante = new DocumentAssinante();
         $this->validator = new Validator();
+    }
+    
+    /**
+     * Converte extensões de arquivo em MIME types
+     */
+    private function getExtensionToMimeMap() {
+        return [
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'txt' => 'text/plain',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'rtf' => 'application/rtf',
+            'odt' => 'application/vnd.oasis.opendocument.text'
+        ];
+    }
+    
+    /**
+     * Obtém tipos MIME permitidos das configurações
+     */
+    private function getAllowedMimeTypes() {
+        $settings = new Settings();
+        $allowedExtensions = $settings->get('allowed_file_types');
+        
+        if (!$allowedExtensions) {
+            // Fallback para tipos padrão
+            return ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+        }
+        
+        $extensions = array_map('trim', explode(',', $allowedExtensions));
+        $mimeMap = $this->getExtensionToMimeMap();
+        $allowedMimes = [];
+        
+        foreach ($extensions as $ext) {
+            if (isset($mimeMap[$ext])) {
+                $allowedMimes[] = $mimeMap[$ext];
+            }
+        }
+        
+        return $allowedMimes;
+    }
+    
+    /**
+     * Obtém tamanho máximo de arquivo das configurações
+     */
+    private function getMaxFileSize() {
+        $settings = new Settings();
+        $maxSizeMB = $settings->get('max_file_size');
+        
+        if (!$maxSizeMB) {
+            $maxSizeMB = 10; // Fallback para 10MB
+        }
+        
+        return $maxSizeMB * 1024 * 1024; // Converter para bytes
     }
     
     public function index() {
@@ -91,8 +149,7 @@ class DocumentController {
             $rules = [
                 'titulo' => 'required|max:255',
                 'descricao' => 'max:1000',
-                'empresa_id' => 'required',
-                'assinantes' => 'required'
+                'empresa_id' => 'required'
             ];
             
             $data = [
@@ -107,7 +164,6 @@ class DocumentController {
             $validator = new Validator($data);
             $validator->required('titulo', 'Título é obrigatório');
             $validator->required('empresa_id', 'Empresa é obrigatória');
-            $validator->required('assinantes', 'Pelo menos um assinante é obrigatório');
             
             // Validar status se fornecido
             $validStatuses = ['rascunho', 'enviado', 'assinado', 'cancelado'];
@@ -129,8 +185,9 @@ class DocumentController {
                 $assinantes = $data['assinantes'];
             }
             
-            if (empty($assinantes) || !is_array($assinantes)) {
-                Response::validation(['assinantes' => ['Pelo menos um assinante é obrigatório']]);
+            // Assinantes são opcionais, mas se fornecidos devem ser um array válido
+            if (!empty($data['assinantes']) && (empty($assinantes) || !is_array($assinantes))) {
+                Response::validation(['assinantes' => ['Formato de assinantes inválido']]);
                 return;
             }
             
@@ -141,8 +198,8 @@ class DocumentController {
             }
             
             $file = $_FILES['arquivo'];
-            $allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
-            $maxSize = 10 * 1024 * 1024; // 10MB
+            $allowedTypes = $this->getAllowedMimeTypes();
+            $maxSize = $this->getMaxFileSize();
             
             if (!in_array($file['type'], $allowedTypes)) {
                 Response::validation(['arquivo' => ['Tipo de arquivo não permitido']]);
@@ -150,7 +207,8 @@ class DocumentController {
             }
             
             if ($file['size'] > $maxSize) {
-                Response::validation(['arquivo' => ['Arquivo muito grande (máximo 10MB)']]);
+                $maxSizeMB = $maxSize / (1024 * 1024);
+                Response::validation(['arquivo' => ["Arquivo muito grande (máximo {$maxSizeMB}MB)"]]);
                 return;
             }
             
@@ -192,19 +250,21 @@ class DocumentController {
             $documentId = $this->document->create($documentData);
             
             if ($documentId) {
-                // Criar vinculações com os assinantes
+                // Criar vinculações com os assinantes (se houver)
                 $assinantesCreated = true;
-                foreach ($assinantes as $assinante) {
-                    $assinanteData = [
-                        'documento_id' => $documentId,
-                        'usuario_id' => $assinante,
-                        'status' => 'pendente',
-                        'observacoes' => null
-                    ];
-                    
-                    if (!$this->documentAssinante->create($assinanteData)) {
-                        $assinantesCreated = false;
-                        break;
+                if (!empty($assinantes)) {
+                    foreach ($assinantes as $assinante) {
+                        $assinanteData = [
+                            'documento_id' => $documentId,
+                            'usuario_id' => $assinante,
+                            'status' => 'pendente',
+                            'observacoes' => null
+                        ];
+                        
+                        if (!$this->documentAssinante->create($assinanteData)) {
+                            $assinantesCreated = false;
+                            break;
+                        }
                     }
                 }
                 
@@ -305,11 +365,16 @@ class DocumentController {
                 'status' => $data['status']
             ];
             
+            // Verificar se o documento possui hash_acesso, se não tiver, gerar um
+            if (empty($document['hash_acesso'])) {
+                $updateData['hash_acesso'] = $this->generateAccessHash();
+            }
+            
             // Processar novo arquivo se enviado
             if (isset($_FILES['arquivo']) && $_FILES['arquivo']['error'] === UPLOAD_ERR_OK) {
                 $file = $_FILES['arquivo'];
-                $allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
-                $maxSize = 10 * 1024 * 1024; // 10MB
+                $allowedTypes = $this->getAllowedMimeTypes();
+                $maxSize = $this->getMaxFileSize();
                 
                 if (!in_array($file['type'], $allowedTypes)) {
                     Response::validation(['arquivo' => ['Tipo de arquivo não permitido']]);
@@ -317,7 +382,8 @@ class DocumentController {
                 }
                 
                 if ($file['size'] > $maxSize) {
-                    Response::validation(['arquivo' => ['Arquivo muito grande (máximo 10MB)']]);
+                    $maxSizeMB = $maxSize / (1024 * 1024);
+                    Response::validation(['arquivo' => ["Arquivo muito grande (máximo {$maxSizeMB}MB)"]]);
                     return;
                 }
                 
@@ -357,6 +423,9 @@ class DocumentController {
                     $updateData['caminho_arquivo'] = 'uploads/documents/' . $fileName;
                     $updateData['tamanho_arquivo'] = $file['size'];
                     $updateData['tipo_arquivo'] = $file['type'];
+                    
+                    // Gerar novo hash quando o arquivo é modificado
+                    $updateData['hash_acesso'] = $this->generateAccessHash();
                 }
             }
             
@@ -440,7 +509,46 @@ class DocumentController {
         }
     }
     
-    public function download($id) {
+    public function download($hash) {
+        try {
+            $user = JWT::requireAuth();
+            
+            $document = $this->document->findByHash($hash);
+            
+            if (!$document) {
+                Response::notFound('Documento não encontrado');
+                return;
+            }
+            
+            // Verificar permissões baseadas no tipo de usuário
+            $hasAccess = $this->checkDocumentAccess($user, $document);
+            
+            if (!$hasAccess) {
+                Response::forbidden('Acesso negado ao documento');
+                return;
+            }
+            
+            $filePath = __DIR__ . '/../' . $document['caminho_arquivo'];
+            
+            if (!file_exists($filePath)) {
+                Response::notFound('Arquivo não encontrado');
+                return;
+            }
+            
+            // Definir headers para download
+            header('Content-Type: ' . $document['tipo_arquivo']);
+            header('Content-Disposition: attachment; filename="' . $document['nome_arquivo'] . '"');
+            header('Content-Length: ' . filesize($filePath));
+            
+            // Enviar arquivo
+            readfile($filePath);
+            exit;
+        } catch (Exception $e) {
+            Response::error('Erro ao baixar documento: ' . $e->getMessage());
+        }
+    }
+    
+    public function view($id) {
         try {
             $user = JWT::requireAuth();
             
@@ -472,16 +580,32 @@ class DocumentController {
                 return;
             }
             
-            // Definir headers para download
+            $fileExtension = strtolower(pathinfo($document['nome_arquivo'], PATHINFO_EXTENSION));
+            
+            // Para arquivos de texto, retornar o conteúdo como JSON
+            if ($fileExtension === 'txt') {
+                $content = file_get_contents($filePath);
+                Response::success([
+                    'type' => 'text',
+                    'content' => $content,
+                    'filename' => $document['nome_arquivo']
+                ]);
+                return;
+            }
+            
+            // Para PDFs e outros arquivos, servir diretamente para visualização
             header('Content-Type: ' . $document['tipo_arquivo']);
-            header('Content-Disposition: attachment; filename="' . $document['nome_arquivo'] . '"');
+            header('Content-Disposition: inline; filename="' . $document['nome_arquivo'] . '"');
             header('Content-Length: ' . filesize($filePath));
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            header('X-Content-Type-Options: nosniff');
             
             // Enviar arquivo
             readfile($filePath);
             exit;
         } catch (Exception $e) {
-            Response::error('Erro ao baixar documento: ' . $e->getMessage());
+            Response::error('Erro ao visualizar documento: ' . $e->getMessage());
         }
     }
     
@@ -640,5 +764,51 @@ class DocumentController {
         $tempFile = tempnam(sys_get_temp_dir(), 'upload_');
         file_put_contents($tempFile, $content);
         return $tempFile;
+    }
+    
+    private function checkDocumentAccess($user, $document) {
+        // Super administrador (tipo 1) tem acesso a tudo
+        if ($user['tipo_usuario'] == 1) {
+            return true;
+        }
+        
+        // Administrador (tipo 2) pode acessar documentos da sua empresa
+        if ($user['tipo_usuario'] == 2) {
+            return $document['empresa_id'] == $user['empresa_id'];
+        }
+        
+        // Usuário assinante (tipo 3) precisa verificar se tem acesso ao documento
+        if ($user['tipo_usuario'] == 3) {
+            // Verificar se pertence à mesma empresa
+            if ($document['empresa_id'] != $user['empresa_id']) {
+                return false;
+            }
+            
+            // Verificar se pertence à mesma filial (se o usuário tem filial específica)
+            if ($user['filial_id'] && $document['filial_id'] != $user['filial_id']) {
+                return false;
+            }
+            
+            // Verificar se o usuário está na lista de assinantes do documento
+            if (isset($document['assinantes']) && is_array($document['assinantes'])) {
+                foreach ($document['assinantes'] as $assinante) {
+                    if ($assinante['usuario_id'] == $user['id']) {
+                        return true;
+                    }
+                }
+            }
+            
+            // Se não está na lista de assinantes, não tem acesso
+            return false;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Gera um hash único para acesso ao documento
+     */
+    private function generateAccessHash() {
+        return hash('sha256', uniqid() . microtime(true) . random_bytes(16));
     }
 }

@@ -11,8 +11,11 @@ class Document {
     }
     
     public function create($data) {
-        $sql = "INSERT INTO {$this->table} (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, criado_por, empresa_id, filial_id) 
-                VALUES (:titulo, :descricao, :nome_arquivo, :caminho_arquivo, :tamanho_arquivo, :tipo_arquivo, :status, :criado_por, :empresa_id, :filial_id)";
+        // Gerar hash único para o documento
+        $hash_acesso = hash('sha256', uniqid() . microtime(true) . random_bytes(16));
+        
+        $sql = "INSERT INTO {$this->table} (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, criado_por, empresa_id, filial_id, hash_acesso) 
+                VALUES (:titulo, :descricao, :nome_arquivo, :caminho_arquivo, :tamanho_arquivo, :tipo_arquivo, :status, :criado_por, :empresa_id, :filial_id, :hash_acesso)";
         
         $stmt = $this->db->prepare($sql);
         
@@ -26,12 +29,44 @@ class Document {
         $stmt->bindParam(':criado_por', $data['criado_por']);
         $stmt->bindParam(':empresa_id', $data['empresa_id']);
         $stmt->bindParam(':filial_id', $data['filial_id']);
+        $stmt->bindParam(':hash_acesso', $hash_acesso);
         
         if ($stmt->execute()) {
             return $this->db->lastInsertId();
         }
         
         return false;
+    }
+    
+    public function findByHash($hash) {
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome 
+                FROM {$this->table} d 
+                LEFT JOIN usuarios u ON d.criado_por = u.id 
+                LEFT JOIN empresas e ON d.empresa_id = e.id 
+                LEFT JOIN filiais f ON d.filial_id = f.id 
+                WHERE d.hash_acesso = :hash AND d.ativo = 1";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':hash', $hash);
+        $stmt->execute();
+        
+        $document = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($document) {
+            // Buscar assinantes do documento
+            $assinantesSql = "SELECT da.usuario_id, u.nome, u.email 
+                             FROM documento_assinantes da 
+                             LEFT JOIN usuarios u ON da.usuario_id = u.id 
+                             WHERE da.documento_id = :documento_id AND da.ativo = 1";
+            
+            $assinantesStmt = $this->db->prepare($assinantesSql);
+            $assinantesStmt->bindParam(':documento_id', $document['id']);
+            $assinantesStmt->execute();
+            
+            $document['assinantes'] = $assinantesStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $document;
     }
     
     public function findById($id) {
@@ -136,7 +171,7 @@ class Document {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'empresa_id', 'filial_id'];
+        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'empresa_id', 'filial_id', 'hash_acesso'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {

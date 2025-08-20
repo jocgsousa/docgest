@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useApp } from '../../contexts/AppContext';
 import Button from '../common/Button';
 import NotificationDetail from '../NotificationDetail';
 import api from '../../services/api';
@@ -298,10 +299,14 @@ function Header({
   onToggleSidebar, 
   onToggleMobileSidebar, 
   sidebarCollapsed,
-  title = 'DocGest'
+  title
 }) {
   const { user, logout } = useAuth();
+  const { appInfo } = useApp();
   const navigate = useNavigate();
+  
+  // Debug log para verificar appInfo no Header
+  console.log('🔧 Header - appInfo recebido:', appInfo);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -469,7 +474,7 @@ function Header({
           {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </MenuButton>
         
-        <PageTitle>{title}</PageTitle>
+        <PageTitle>{title || appInfo.app_name}</PageTitle>
       </LeftSection>
       
       <RightSection>

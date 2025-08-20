@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import LandingHeader from '../components/layout/LandingHeader';
 import { Shield, Users, Award, Target, Heart, Zap } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -215,6 +216,7 @@ const FooterText = styled.p`
 
 function Sobre() {
   const navigate = useNavigate();
+  const { appInfo } = useApp();
 
   const handleTestClick = () => {
     navigate('/cadastro?tipo=empresa&teste=true');
@@ -271,7 +273,7 @@ function Sobre() {
       <HeroSection>
         <HeroContent>
           <HeroTitle>
-            Sobre o DocGest
+            Sobre o {appInfo.app_name}
           </HeroTitle>
           <HeroSubtitle>
             Somos uma empresa dedicada a revolucionar a gestão de documentos, 
@@ -285,7 +287,7 @@ function Sobre() {
           <StoryContent>
             <SectionTitle>Nossa História</SectionTitle>
             <StoryText>
-              O DocGest nasceu da necessidade de simplificar e modernizar os processos de gestão documental. 
+              O {appInfo.app_name} nasceu da necessidade de simplificar e modernizar os processos de gestão documental. 
               Fundada por uma equipe de especialistas em tecnologia e gestão empresarial, nossa missão é 
               eliminar a burocracia desnecessária e acelerar os processos de negócio através da digitalização inteligente.
             </StoryText>
@@ -339,7 +341,7 @@ function Sobre() {
 
       <CTASection>
         <SectionContainer>
-          <CTATitle>Pronto para conhecer o DocGest?</CTATitle>
+          <CTATitle>Pronto para conhecer o {appInfo?.app_name || 'DocGest'}?</CTATitle>
           <CTASubtitle>
             Junte-se às centenas de empresas que já transformaram sua gestão de documentos. 
             Comece seu teste gratuito hoje mesmo!
@@ -365,7 +367,7 @@ function Sobre() {
 
       <Footer>
         <FooterText>
-          © 2024 DocGest. Todos os direitos reservados.
+          © 2024 {appInfo.app_name}. Todos os direitos reservados.
         </FooterText>
       </Footer>
     </Container>

@@ -53,6 +53,20 @@ try {
     $id = $segments[1] ?? null;
     $action = $segments[2] ?? null;
     
+    // Rota pública para informações da aplicação
+    if ($resource === 'app-info' && $method === 'GET') {
+        $settingsController = new SettingsController();
+        $settingsController->getAppInfo();
+        exit;
+    }
+    
+    // Rota pública para configurações de upload
+    if ($resource === 'upload-config' && $method === 'GET') {
+        $settingsController = new SettingsController();
+        $settingsController->getUploadConfig();
+        exit;
+    }
+    
     switch ($resource) {
         // Rotas de Autenticação
         case 'auth':
@@ -363,7 +377,9 @@ try {
                     } elseif ($action === null) {
                         $controller->show($id);
                     } elseif ($action === 'download') {
-                        $controller->download($id);
+                        $controller->download($id); // $id agora será o hash
+                    } elseif ($action === 'view') {
+                        $controller->view($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -499,7 +515,13 @@ try {
             switch ($method) {
                 case 'GET':
                     if ($id === null) {
-                        $controller->index();
+                        $controller->index(); // Buscar todas as configurações
+                    } elseif ($id === 'metadata') {
+                        $controller->getAllWithMetadata(); // Buscar com metadados
+                    } elseif ($action === null) {
+                        $controller->show($id); // Buscar configuração específica
+                    } elseif ($action === 'category') {
+                        $controller->getByCategory($id); // Buscar por categoria
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -507,17 +529,25 @@ try {
                     
                 case 'PUT':
                     if ($id === null) {
-                        $controller->update();
+                        $controller->update(); // Atualizar múltiplas configurações
+                    } else {
+                        $controller->updateSingle($id); // Atualizar configuração específica
+                    }
+                    break;
+                    
+                case 'POST':
+                    if ($id === 'restore-defaults') {
+                        $controller->restoreDefaults(); // Restaurar configurações padrão
+                    } elseif ($id === null) {
+                        $controller->store(); // Criar nova configuração
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
                     break;
                     
-                case 'POST':
-                    if ($id === 'reset') {
-                        $controller->reset();
-                    } elseif ($id === 'test-email') {
-                        $controller->testEmail();
+                case 'DELETE':
+                    if ($id !== null) {
+                        $controller->delete($id); // Remover configuração
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }

@@ -1,0 +1,9 @@
+[19-Aug-2025 21:55:30 America/Sao_Paulo] PHP Fatal error:  Uncaught Error: Undefined constant "JWT_SECRET" in C:\dev\docgest\backend\utils\JWT.php:27
+Stack trace:
+#0 C:\dev\docgest\backend\utils\JWT.php(110): JWT::decode()
+#1 C:\dev\docgest\debug_frontend_error.php(60): JWT::validateToken()
+#2 {main}
+  thrown in C:\dev\docgest\backend\utils\JWT.php on line 27
+[19-Aug-2025 21:55:47 America/Sao_Paulo] Frontend Error 500: Erro na decodificação JSON: Syntax error - #0 {main}
+[19-Aug-2025 21:56:10 America/Sao_Paulo] Frontend Error 500: Method SettingsController::validateSetting() does not exist - #0 C:\dev\docgest\debug_frontend_error.php(91): ReflectionClass->getMethod()
+#1 {main}

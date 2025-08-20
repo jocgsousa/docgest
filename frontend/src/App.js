@@ -28,6 +28,7 @@ import Contato from './pages/Contato';
 import Layout from './components/layout/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
+import { AppProvider } from './contexts/AppContext';
 
 const theme = {
   colors: {
@@ -135,10 +136,11 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
-      <AuthProvider>
-        <DataProvider>
-           <Router>
-             <AppContainer>
+      <AppProvider>
+        <AuthProvider>
+          <DataProvider>
+             <Router>
+               <AppContainer>
                <Routes>
               {/* Páginas públicas */}
               <Route path="/" element={<LandingPage />} />
@@ -324,11 +326,12 @@ function App() {
               </ProtectedRoute>
             } />
 
-            </Routes>
-             </AppContainer>
-           </Router>
-        </DataProvider>
-      </AuthProvider>
+              </Routes>
+               </AppContainer>
+             </Router>
+          </DataProvider>
+        </AuthProvider>
+      </AppProvider>
     </ThemeProvider>
   );
 }

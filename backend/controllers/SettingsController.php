@@ -1,32 +1,77 @@
 <?php
 
-require_once __DIR__ . '/../utils/JWT.php';
+require_once __DIR__ . '/../models/Settings.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../utils/Validator.php';
+require_once __DIR__ . '/../utils/JWT.php';
 
 class SettingsController {
-    private $db;
-    private $settingsFile;
+    private $settingsModel;
     
     public function __construct() {
-        global $pdo;
-        $this->db = $pdo;
-        $this->settingsFile = __DIR__ . '/../config/settings.json';
+        $this->settingsModel = new Settings();
     }
     
     /**
-     * Obtém todas as configurações
+     * Busca todas as configurações
      */
     public function index() {
         try {
-            JWT::requireAdmin(); // Apenas Super Admin
+            // Verificar autenticação e permissão (apenas Super Admin)
+            $user = JWT::requireAdmin();
             
-            $settings = $this->loadSettings();
-            
-            Response::success($settings, 'Configurações recuperadas com sucesso');
+            $settings = $this->settingsModel->getAll();
+            Response::success($settings);
             
         } catch (Exception $e) {
-            Response::handleException($e);
+            Response::error('Erro ao buscar configurações: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Busca configurações por categoria
+     */
+    public function getByCategory($category) {
+        try {
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão
+            if ($user['tipo_usuario'] != 1 && $user['tipo_usuario'] != 2) {
+                Response::error('Acesso negado', 403);
+            }
+            
+            $settings = $this->settingsModel->getByCategory($category);
+            Response::success($settings);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao buscar configurações: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Busca uma configuração específica
+     */
+    public function show($key) {
+        try {
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão
+            if ($user['tipo_usuario'] != 1 && $user['tipo_usuario'] != 2) {
+                Response::error('Acesso negado', 403);
+            }
+            
+            $setting = $this->settingsModel->get($key);
+            
+            if ($setting === null) {
+                Response::error('Configuração não encontrada', 404);
+            }
+            
+            Response::success(['value' => $setting]);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao buscar configuração: ' . $e->getMessage(), 500);
         }
     }
     
@@ -35,217 +80,358 @@ class SettingsController {
      */
     public function update() {
         try {
-            JWT::requireAdmin(); // Apenas Super Admin
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão (apenas Super Admin pode atualizar configurações)
+            if ($user['tipo_usuario'] != 1) {
+                Response::error('Acesso negado', 403);
+            }
             
             $input = json_decode(file_get_contents('php://input'), true);
             
-            if (!$input) {
-                Response::badRequest('Dados inválidos');
-                return;
+            if (empty($input)) {
+                Response::error('Dados não fornecidos', 400);
             }
             
-            // Validar configurações
-            $errors = $this->validateSettings($input);
-            if (!empty($errors)) {
-                Response::badRequest('Dados inválidos', $errors);
-                return;
+            // Filtrar apenas campos válidos de configuração
+            $validKeys = [
+                'app_name', 'max_file_size', 'allowed_file_types', 'smtp_host', 'smtp_port',
+                'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name',
+                'email_notifications', 'whatsapp_notifications', 'signature_reminders',
+                'expiration_alerts', 'password_min_length', 'require_password_complexity',
+                'session_timeout', 'max_login_attempts', 'signature_expiration_days',
+                'auto_reminder_days', 'max_signers_per_document'
+            ];
+            
+            $filteredInput = [];
+            foreach ($validKeys as $key) {
+                if (isset($input[$key])) {
+                    $filteredInput[$key] = $input[$key];
+                }
             }
             
-            // Salvar configurações
-            $this->saveSettings($input);
+            if (empty($filteredInput)) {
+                Response::error('Nenhuma configuração válida fornecida', 400);
+            }
             
-            Response::success($input, 'Configurações atualizadas com sucesso');
+            // Validar configurações específicas
+            $this->validateSettings($filteredInput);
+            
+            // Atualizar configurações
+            $success = $this->settingsModel->setMultiple($filteredInput);
+            
+            if (!$success) {
+                Response::error('Erro ao atualizar configurações', 500);
+            }
+            
+            Response::success(['message' => 'Configurações atualizadas com sucesso']);
             
         } catch (Exception $e) {
-            Response::handleException($e);
+            Response::error('Erro ao atualizar configurações: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Atualiza uma configuração específica
+     */
+    public function updateSingle($key) {
+        try {
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão (apenas Super Admin pode atualizar configurações)
+            if ($user['tipo_usuario'] != 1) {
+                Response::error('Acesso negado', 403);
+            }
+            
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($input['value'])) {
+                Response::error('Valor não fornecido', 400);
+            }
+            
+            // Validar configuração específica
+            $this->validateSingleSetting($key, $input['value']);
+            
+            // Atualizar configuração
+            $success = $this->settingsModel->set($key, $input['value']);
+            
+            if (!$success) {
+                Response::error('Erro ao atualizar configuração', 500);
+            }
+            
+            Response::success(['message' => 'Configuração atualizada com sucesso']);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao atualizar configuração: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Cria uma nova configuração
+     */
+    public function store() {
+        try {
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão (apenas Super Admin pode criar configurações)
+            if ($user['tipo_usuario'] != 1) {
+                Response::error('Acesso negado', 403);
+            }
+            
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            // Validação
+            $validator = Validator::make($input)
+                ->required('chave', 'Chave é obrigatória')
+                ->required('valor', 'Valor é obrigatório')
+                ->required('tipo', 'Tipo é obrigatório')
+                ->in('tipo', ['string', 'number', 'boolean', 'json'], 'Tipo deve ser: string, number, boolean ou json');
+            
+            $success = $this->settingsModel->create(
+                $input['chave'],
+                $input['valor'],
+                $input['tipo'],
+                $input['descricao'] ?? '',
+                $input['categoria'] ?? 'geral'
+            );
+            
+            if (!$success) {
+                Response::error('Erro ao criar configuração', 500);
+            }
+            
+            Response::success(['message' => 'Configuração criada com sucesso'], 201);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao criar configuração: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Remove uma configuração
+     */
+    public function delete($key) {
+        try {
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão (apenas Super Admin pode remover configurações)
+            if ($user['tipo_usuario'] != 1) {
+                Response::error('Acesso negado', 403);
+            }
+            
+            $success = $this->settingsModel->delete($key);
+            
+            if (!$success) {
+                Response::error('Erro ao remover configuração', 500);
+            }
+            
+            Response::success(['message' => 'Configuração removida com sucesso']);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao remover configuração: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Lista todas as configurações com metadados
+     */
+    public function getAllWithMetadata() {
+        try {
+            // Verificar autenticação
+            $user = JWT::validateToken();
+            
+            // Verificar permissão (apenas Super Admin pode ver metadados)
+            if ($user['tipo_usuario'] != 1) {
+                Response::error('Acesso negado', 403);
+            }
+            
+            $settings = $this->settingsModel->getAllWithMetadata();
+            Response::success($settings);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao buscar configurações: ' . $e->getMessage(), 500);
         }
     }
     
     /**
      * Restaura configurações padrão
      */
-    public function reset() {
+    public function restoreDefaults() {
         try {
-            JWT::requireAdmin(); // Apenas Super Admin
+            // Verificar autenticação
+            $user = JWT::validateToken();
             
-            $defaultSettings = $this->getDefaultSettings();
-            $this->saveSettings($defaultSettings);
+            // Verificar permissão (apenas Super Admin pode restaurar padrões)
+            if ($user['tipo_usuario'] != 1) {
+                Response::error('Acesso negado', 403);
+            }
             
-            Response::success($defaultSettings, 'Configurações restauradas para o padrão');
+            $success = $this->settingsModel->restoreDefaults();
+            
+            if (!$success) {
+                Response::error('Erro ao restaurar configurações padrão', 500);
+            }
+            
+            Response::success(['message' => 'Configurações padrão restauradas com sucesso']);
             
         } catch (Exception $e) {
-            Response::handleException($e);
+            Response::error('Erro ao restaurar configurações: ' . $e->getMessage(), 500);
         }
     }
     
     /**
-     * Carrega configurações do arquivo
-     */
-    private function loadSettings() {
-        if (file_exists($this->settingsFile)) {
-            $settings = json_decode(file_get_contents($this->settingsFile), true);
-            if ($settings) {
-                return array_merge($this->getDefaultSettings(), $settings);
-            }
-        }
-        
-        return $this->getDefaultSettings();
-    }
-    
-    /**
-     * Salva configurações no arquivo
-     */
-    private function saveSettings($settings) {
-        $settingsDir = dirname($this->settingsFile);
-        if (!is_dir($settingsDir)) {
-            mkdir($settingsDir, 0755, true);
-        }
-        
-        $result = file_put_contents($this->settingsFile, json_encode($settings, JSON_PRETTY_PRINT));
-        
-        if ($result === false) {
-            throw new Exception('Erro ao salvar configurações');
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Configurações padrão do sistema
-     */
-    private function getDefaultSettings() {
-        return [
-            // Configurações gerais
-            'app_name' => 'DocGest',
-            'max_file_size' => '10',
-            'allowed_file_types' => 'pdf,doc,docx,jpg,jpeg,png',
-            
-            // Configurações de email
-            'smtp_host' => 'smtp.gmail.com',
-            'smtp_port' => '587',
-            'smtp_username' => '',
-            'smtp_password' => '',
-            'smtp_from_email' => 'noreply@docgest.com',
-            'smtp_from_name' => 'DocGest',
-            
-            // Configurações de notificação
-            'email_notifications' => true,
-            'whatsapp_notifications' => false,
-            'signature_reminders' => true,
-            'expiration_alerts' => true,
-            
-            // Configurações de segurança
-            'password_min_length' => '8',
-            'require_password_complexity' => true,
-            'session_timeout' => '24',
-            'max_login_attempts' => '5',
-            
-            // Configurações de assinatura
-            'signature_expiration_days' => '30',
-            'auto_reminder_days' => '7',
-            'max_signers_per_document' => '10'
-        ];
-    }
-    
-    /**
-     * Valida configurações
+     * Valida múltiplas configurações
      */
     private function validateSettings($settings) {
-        $errors = [];
-        
-        // Validar nome da aplicação
-        if (empty($settings['app_name']) || strlen($settings['app_name']) < 2) {
-            $errors['app_name'] = ['Nome da aplicação deve ter pelo menos 2 caracteres'];
+        foreach ($settings as $key => $value) {
+            $this->validateSingleSetting($key, $value);
         }
-        
-        // Validar tamanho máximo de arquivo
-        if (!is_numeric($settings['max_file_size']) || $settings['max_file_size'] < 1 || $settings['max_file_size'] > 100) {
-            $errors['max_file_size'] = ['Tamanho máximo deve ser entre 1 e 100 MB'];
-        }
-        
-        // Validar tipos de arquivo
-        if (empty($settings['allowed_file_types'])) {
-            $errors['allowed_file_types'] = ['Pelo menos um tipo de arquivo deve ser permitido'];
-        }
-        
-        // Validar configurações de email se fornecidas
-        if (!empty($settings['smtp_host'])) {
-            if (empty($settings['smtp_port']) || !is_numeric($settings['smtp_port'])) {
-                $errors['smtp_port'] = ['Porta SMTP deve ser um número válido'];
-            }
-            
-            if (!empty($settings['smtp_from_email']) && !filter_var($settings['smtp_from_email'], FILTER_VALIDATE_EMAIL)) {
-                $errors['smtp_from_email'] = ['Email remetente deve ser um email válido'];
-            }
-        }
-        
-        // Validar configurações de segurança
-        if (!is_numeric($settings['password_min_length']) || $settings['password_min_length'] < 6 || $settings['password_min_length'] > 20) {
-            $errors['password_min_length'] = ['Comprimento mínimo da senha deve ser entre 6 e 20 caracteres'];
-        }
-        
-        if (!is_numeric($settings['session_timeout']) || $settings['session_timeout'] < 1 || $settings['session_timeout'] > 168) {
-            $errors['session_timeout'] = ['Timeout de sessão deve ser entre 1 e 168 horas'];
-        }
-        
-        if (!is_numeric($settings['max_login_attempts']) || $settings['max_login_attempts'] < 3 || $settings['max_login_attempts'] > 10) {
-            $errors['max_login_attempts'] = ['Máximo de tentativas deve ser entre 3 e 10'];
-        }
-        
-        // Validar configurações de assinatura
-        if (!is_numeric($settings['signature_expiration_days']) || $settings['signature_expiration_days'] < 1 || $settings['signature_expiration_days'] > 365) {
-            $errors['signature_expiration_days'] = ['Dias para expiração deve ser entre 1 e 365'];
-        }
-        
-        if (!is_numeric($settings['auto_reminder_days']) || $settings['auto_reminder_days'] < 1 || $settings['auto_reminder_days'] > 30) {
-            $errors['auto_reminder_days'] = ['Dias para lembrete deve ser entre 1 e 30'];
-        }
-        
-        if (!is_numeric($settings['max_signers_per_document']) || $settings['max_signers_per_document'] < 1 || $settings['max_signers_per_document'] > 50) {
-            $errors['max_signers_per_document'] = ['Máximo de signatários deve ser entre 1 e 50'];
-        }
-        
-        return $errors;
     }
     
     /**
-     * Obtém uma configuração específica
+     * Valida uma configuração específica
      */
-    public function getSetting($key) {
-        $settings = $this->loadSettings();
-        return isset($settings[$key]) ? $settings[$key] : null;
+    private function validateSingleSetting($key, $value) {
+        switch ($key) {
+            case 'max_file_size':
+                if (!is_numeric($value) || $value <= 0 || $value > 100) {
+                    throw new Exception('Tamanho máximo de arquivo deve ser entre 1 e 100 MB');
+                }
+                break;
+                
+            case 'smtp_port':
+                if (!is_numeric($value) || $value <= 0 || $value > 65535) {
+                    throw new Exception('Porta SMTP deve ser entre 1 e 65535');
+                }
+                break;
+                
+            case 'password_min_length':
+                if (!is_numeric($value) || $value < 6 || $value > 20) {
+                    throw new Exception('Comprimento mínimo da senha deve ser entre 6 e 20 caracteres');
+                }
+                break;
+                
+            case 'session_timeout':
+                if (!is_numeric($value) || $value < 1 || $value > 168) {
+                    throw new Exception('Timeout de sessão deve ser entre 1 e 168 horas');
+                }
+                break;
+                
+            case 'max_login_attempts':
+                if (!is_numeric($value) || $value < 3 || $value > 10) {
+                    throw new Exception('Máximo de tentativas de login deve ser entre 3 e 10');
+                }
+                break;
+                
+            case 'signature_expiration_days':
+                if (!is_numeric($value) || $value < 1 || $value > 365) {
+                    throw new Exception('Dias para expiração deve ser entre 1 e 365');
+                }
+                break;
+                
+            case 'auto_reminder_days':
+                if (!is_numeric($value) || $value < 1 || $value > 30) {
+                    throw new Exception('Dias para lembrete deve ser entre 1 e 30');
+                }
+                break;
+                
+            case 'max_signers_per_document':
+                if (!is_numeric($value) || $value < 1 || $value > 50) {
+                    throw new Exception('Máximo de signatários deve ser entre 1 e 50');
+                }
+                break;
+                
+            case 'smtp_from_email':
+                if (!empty($value) && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                    throw new Exception('Email remetente deve ser um email válido');
+                }
+                break;
+                
+            case 'allowed_file_types':
+                if (!empty($value)) {
+                    $types = explode(',', $value);
+                    $allowedTypes = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif', 'txt', 'rtf', 'odt'];
+                    foreach ($types as $type) {
+                        $type = trim($type);
+                        if (!in_array($type, $allowedTypes)) {
+                            throw new Exception("Tipo de arquivo '{$type}' não é permitido");
+                        }
+                    }
+                }
+                break;
+        }
     }
     
     /**
-     * Define uma configuração específica
+     * Retorna informações públicas da aplicação (sem autenticação)
      */
-    public function setSetting($key, $value) {
-        $settings = $this->loadSettings();
-        $settings[$key] = $value;
-        return $this->saveSettings($settings);
-    }
-    
-    /**
-     * Testa configurações de email
-     */
-    public function testEmail() {
+    public function getAppInfo() {
         try {
-            JWT::requireAdmin(); // Apenas Super Admin
+            // Buscar apenas o nome da aplicação
+            $appName = $this->settingsModel->get('app_name');
             
-            $settings = $this->loadSettings();
-            
-            if (empty($settings['smtp_host']) || empty($settings['smtp_username'])) {
-                Response::badRequest('Configurações de email não estão completas');
-                return;
+            // Se não encontrar, usar valor padrão
+            if (!$appName) {
+                $appName = 'DocGest';
             }
             
-            // Aqui você implementaria o teste real de envio de email
-            // Por enquanto, vamos simular um teste bem-sucedido
+            $appInfo = [
+                'app_name' => $appName,
+                'version' => '1.0.0',
+                'api_version' => 'v1'
+            ];
             
-            Response::success(null, 'Teste de email realizado com sucesso');
+            Response::success($appInfo, 'Informações da aplicação obtidas com sucesso');
             
         } catch (Exception $e) {
-            Response::handleException($e);
+            // Em caso de erro, retornar valores padrão
+            $appInfo = [
+                'app_name' => 'DocGest',
+                'version' => '1.0.0',
+                'api_version' => 'v1'
+            ];
+            
+            Response::success($appInfo, 'Informações padrão da aplicação');
+        }
+    }
+    
+    /**
+     * Retorna configurações públicas de upload (sem autenticação)
+     */
+    public function getUploadConfig() {
+        try {
+            // Buscar configurações de upload
+            $allowedFileTypes = $this->settingsModel->get('allowed_file_types');
+            $maxFileSize = $this->settingsModel->get('max_file_size');
+            
+            // Valores padrão se não encontrar
+            if (!$allowedFileTypes) {
+                $allowedFileTypes = 'pdf,doc,docx,txt';
+            }
+            if (!$maxFileSize) {
+                $maxFileSize = 10;
+            }
+            
+            $uploadConfig = [
+                'allowed_file_types' => $allowedFileTypes,
+                'max_file_size' => (int)$maxFileSize,
+                'max_file_size_bytes' => (int)$maxFileSize * 1024 * 1024
+            ];
+            
+            Response::success($uploadConfig, 'Configurações de upload obtidas com sucesso');
+            
+        } catch (Exception $e) {
+            // Em caso de erro, retornar valores padrão
+            $uploadConfig = [
+                'allowed_file_types' => 'pdf,doc,docx,txt',
+                'max_file_size' => 10,
+                'max_file_size_bytes' => 10 * 1024 * 1024
+            ];
+            
+            Response::success($uploadConfig, 'Configurações padrão de upload');
         }
     }
 }

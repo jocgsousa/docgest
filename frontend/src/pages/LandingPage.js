@@ -3,7 +3,9 @@ import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import LandingHeader from '../components/layout/LandingHeader';
+
 import { CheckCircle, Shield, Clock, Users, FileText, Zap } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -212,6 +214,7 @@ const FooterText = styled.p`
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { appInfo } = useApp();
 
   const handleTestClick = () => {
     navigate('/cadastro?tipo=empresa&teste=true');
@@ -319,7 +322,7 @@ function LandingPage() {
 
       <FeaturesSection>
         <SectionContainer>
-          <SectionTitle>Por que escolher o DocGest?</SectionTitle>
+          <SectionTitle>Por que escolher o {appInfo?.app_name || 'DocGest'}?</SectionTitle>
           <SectionSubtitle>
             Nossa plataforma oferece todas as ferramentas necessárias para modernizar 
             a gestão de documentos da sua empresa
@@ -390,7 +393,7 @@ function LandingPage() {
 
       <Footer>
         <FooterText>
-          © 2024 DocGest. Todos os direitos reservados.
+          © 2024 {appInfo.app_name}. Todos os direitos reservados.
         </FooterText>
       </Footer>
     </Container>

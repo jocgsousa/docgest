@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
-import api from '../services/api';
+import api, { publicApi } from '../services/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Card from '../components/Card';
@@ -10,6 +10,8 @@ import Table from '../components/Table';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import { formatErrors } from '../utils/fieldLabels';
+import { toast } from 'react-toastify';
+import { FaPlus, FaEdit, FaTrash, FaEye, FaUpload, FaFilePdf, FaFileWord, FaFileExcel, FaFileImage, FaFile, FaTimes, FaDownload } from 'react-icons/fa';
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -129,6 +131,95 @@ const StatLabel = styled.div`
   color: ${props => props.theme.colors.textSecondary};
 `;
 
+const ViewModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+`;
+
+const ViewModalContent = styled.div`
+  background: white;
+  border-radius: 8px;
+  width: 95vw;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+`;
+
+const ViewModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.background};
+  border-radius: 8px 8px 0 0;
+`;
+
+const ViewModalTitle = styled.h3`
+  margin: 0;
+  flex: 1;
+  color: ${props => props.theme.colors.text};
+`;
+
+const ViewModalActions = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const ViewModalBody = styled.div`
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const TextContent = styled.div`
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  background: #f8f9fa;
+  border-radius: 4px;
+  overflow: auto;
+`;
+
+const PdfViewer = styled.iframe`
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 4px;
+`;
+
+const DownloadMessage = styled.div`
+  text-align: center;
+  padding: 40px;
+  color: ${props => props.theme.colors.textSecondary};
+  
+  h3 {
+    margin-bottom: 16px;
+    color: ${props => props.theme.colors.text};
+  }
+  
+  p {
+    margin-bottom: 24px;
+  }
+`;
+
 const Documents = () => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
@@ -158,9 +249,18 @@ const Documents = () => {
   const [submitting, setSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [companies, setCompanies] = useState([]);
+  const [uploadConfig, setUploadConfig] = useState({
+    allowed_file_types: 'pdf,doc,docx,txt',
+    max_file_size: 10,
+    max_file_size_bytes: 10 * 1024 * 1024
+  });
   const [branches, setBranches] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState(null);
+  const [documentContent, setDocumentContent] = useState(null);
+  const [loadingContent, setLoadingContent] = useState(false);
 
   const statusOptions = [
     { value: '', label: 'Todos os status' },
@@ -252,7 +352,18 @@ const Documents = () => {
 
   useEffect(() => {
     loadCompanies();
+    loadUploadConfig();
   }, []);
+
+  const loadUploadConfig = async () => {
+    try {
+      const config = await publicApi.getUploadConfig();
+      setUploadConfig(config);
+    } catch (error) {
+      console.error('Erro ao carregar configurações de upload:', error);
+      // Mantém os valores padrão em caso de erro
+    }
+  };
 
   useEffect(() => {
     if (formData.empresa_id) {
@@ -444,11 +555,168 @@ const Documents = () => {
     }
   };
 
-  const handleView = (document) => {
-    if (document.caminho_arquivo) {
-      // Abrir o documento em uma nova aba
-      window.open(`${api.defaults.baseURL}/documents/${document.id}/download`, '_blank');
+  const handleView = async (document) => {
+    if (!document.caminho_arquivo) {
+      toast.error('Documento não possui arquivo anexado');
+      return;
     }
+
+    setViewingDocument(document);
+    setShowViewModal(true);
+    setLoadingContent(true);
+    setDocumentContent(null);
+
+    try {
+      const fileExtension = document.nome_arquivo.split('.').pop().toLowerCase();
+      
+      // Para arquivos que devem ser baixados (DOCX, planilhas)
+      if (['docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt'].includes(fileExtension)) {
+        setDocumentContent({ type: 'download', extension: fileExtension });
+        setLoadingContent(false);
+        return;
+      }
+      
+      // Para arquivos de texto, buscar o conteúdo via API
+      if (fileExtension === 'txt') {
+        const response = await api.get(`/documents/${document.id}/view`);
+        setDocumentContent(response.data.data);
+      } else {
+        // Para PDFs e outros arquivos, buscar como blob com autenticação
+        const response = await api.get(`/documents/${document.id}/view`, {
+          responseType: 'blob'
+        });
+        
+        // Criar URL local para o blob
+        const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        setDocumentContent({ 
+          type: 'file', 
+          url: blobUrl,
+          extension: fileExtension 
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar documento:', error);
+      toast.error('Erro ao carregar documento');
+      setShowViewModal(false);
+    } finally {
+      setLoadingContent(false);
+    }
+  };
+
+  const handleCloseViewModal = () => {
+    // Limpar URL do blob se existir
+    if (documentContent && documentContent.type === 'file' && documentContent.url && documentContent.url.startsWith('blob:')) {
+      URL.revokeObjectURL(documentContent.url);
+    }
+    
+    setShowViewModal(false);
+    setViewingDocument(null);
+    setDocumentContent(null);
+  };
+
+  const handleDownloadDocument = async () => {
+    if (viewingDocument && viewingDocument.hash_acesso) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+           toast.error('Token de autenticação não encontrado');
+           return;
+         }
+
+        // Criar um link temporário para download com autenticação
+        const response = await api.get(`/documents/${viewingDocument.hash_acesso}/download`, {
+          responseType: 'blob',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        // Criar URL do blob e fazer download
+        const blob = new Blob([response.data]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = viewingDocument.nome_arquivo || 'documento';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+         console.error('Erro ao baixar documento:', error);
+         toast.error('Erro ao baixar documento: ' + (error.response?.data?.message || error.message));
+       }
+    } else {
+       toast.error('Hash de acesso do documento não encontrado');
+     }
+  };
+
+  const renderDocumentContent = () => {
+    if (loadingContent) {
+      return (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <p>Carregando documento...</p>
+        </div>
+      );
+    }
+
+    if (!documentContent) {
+      return (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <p>Erro ao carregar documento</p>
+        </div>
+      );
+    }
+
+    // Conteúdo de texto
+    if (documentContent.type === 'text') {
+      return (
+        <TextContent>
+          {documentContent.content}
+        </TextContent>
+      );
+    }
+
+    // Arquivos para download
+    if (documentContent.type === 'download') {
+      return (
+        <DownloadMessage>
+          <h3>Arquivo {documentContent.extension.toUpperCase()}</h3>
+          <p>Este tipo de arquivo precisa ser baixado para visualização.</p>
+          <Button onClick={handleDownloadDocument}>
+            <FaDownload style={{ marginRight: '8px' }} />
+            Baixar Arquivo
+          </Button>
+        </DownloadMessage>
+      );
+    }
+
+    // PDFs e outros arquivos
+    if (documentContent.type === 'file') {
+      if (documentContent.extension === 'pdf') {
+        return (
+          <PdfViewer
+            src={documentContent.url}
+            title={viewingDocument?.nome_arquivo}
+          />
+        );
+      } else {
+        // Para outros tipos de arquivo, mostrar opção de download
+        return (
+          <DownloadMessage>
+            <h3>Arquivo {documentContent.extension.toUpperCase()}</h3>
+            <p>Visualização não disponível para este tipo de arquivo.</p>
+            <Button onClick={handleDownloadDocument}>
+              <FaDownload style={{ marginRight: '8px' }} />
+              Baixar Arquivo
+            </Button>
+          </DownloadMessage>
+        );
+      }
+    }
+
+    return null;
   };
 
   const handleDelete = async (documentId) => {
@@ -489,7 +757,52 @@ const Documents = () => {
   };
 
   const handleFileSelect = (file) => {
+    if (!file) {
+      // Limpar arquivo e erros se nenhum arquivo foi selecionado
+      setFormData(prev => ({ ...prev, arquivo: null }));
+      setErrors(prev => ({ ...prev, arquivo: null }));
+      return;
+    }
+    
+    // Limpar erros anteriores imediatamente
+    setErrors(prev => ({ ...prev, arquivo: null }));
+    
+    // Validar tipo do arquivo primeiro
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    const allowedTypes = uploadConfig.allowed_file_types ? 
+      uploadConfig.allowed_file_types.split(',').map(type => type.trim().toLowerCase()) :
+      ['pdf', 'doc', 'docx', 'txt'];
+    
+    if (!allowedTypes.includes(fileExtension)) {
+      setErrors(prev => ({
+        ...prev,
+        arquivo: [`Tipo de arquivo não permitido. Tipos aceitos: ${allowedTypes.join(', ').toUpperCase()}`]
+      }));
+      // Não definir o arquivo se o tipo for inválido
+      setFormData(prev => ({ ...prev, arquivo: null }));
+      return;
+    }
+    
+    // Validar tamanho do arquivo
+    const maxSizeBytes = uploadConfig.max_file_size_bytes || (10 * 1024 * 1024); // 10MB default
+    const maxSizeMB = uploadConfig.max_file_size || 10;
+    
+    if (file.size > maxSizeBytes) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      setErrors(prev => ({
+        ...prev,
+        arquivo: [`Arquivo muito grande (${fileSizeMB}MB). Tamanho máximo permitido: ${maxSizeMB}MB`]
+      }));
+      // Não definir o arquivo se o tamanho for inválido
+      setFormData(prev => ({ ...prev, arquivo: null }));
+      return;
+    }
+    
+    // Se chegou até aqui, o arquivo é válido
     setFormData(prev => ({ ...prev, arquivo: file }));
+    
+    // Mostrar feedback positivo (opcional)
+    console.log(`Arquivo válido selecionado: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
   };
 
   const handleDragOver = (e) => {
@@ -705,7 +1018,7 @@ const Documents = () => {
           <FormRow>
             <div>
               <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                Assinantes *
+                Assinantes
               </label>
               <div style={{ 
                 border: '1px solid #d1d5db', 
@@ -801,40 +1114,60 @@ const Documents = () => {
                 Arquivo {!editingDocument && '*'}
               </label>
               <FileUploadArea
-                className={dragOver ? 'dragover' : ''}
+                className={`${dragOver ? 'dragover' : ''} ${errors.arquivo ? 'error' : ''}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => document.getElementById('file-input').click()}
+                style={{
+                  borderColor: errors.arquivo ? '#dc2626' : (formData.arquivo ? '#10b981' : '#d1d5db'),
+                  backgroundColor: errors.arquivo ? '#fef2f2' : (formData.arquivo ? '#f0fdf4' : '#ffffff')
+                }}
               >
                 <input
                   id="file-input"
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt"
+                  accept={uploadConfig.allowed_file_types ? uploadConfig.allowed_file_types.split(',').map(type => `.${type}`).join(',') : '.pdf,.doc,.docx,.txt'}
                   onChange={(e) => handleFileSelect(e.target.files[0])}
                   style={{ display: 'none' }}
                 />
                 {formData.arquivo ? (
                   <FileInfo>
-                    <span>📄</span>
-                    <span>{formData.arquivo.name}</span>
+                    <span style={{ color: '#10b981', fontSize: '20px' }}>✅</span>
+                    <span style={{ color: '#059669', fontWeight: '500' }}>{formData.arquivo.name}</span>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>({(formData.arquivo.size / (1024 * 1024)).toFixed(2)}MB)</span>
                     <Button
                       type="button"
                       size="sm"
                       $variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setFormData(prev => ({ ...prev, arquivo: null }));
+                        handleFileSelect(null); // Usar a função para limpar corretamente
                       }}
                     >
                       Remover
                     </Button>
                   </FileInfo>
-                ) : (
-                  <div>
-                    <p>Clique aqui ou arraste um arquivo</p>
+                ) : errors.arquivo ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <span style={{ color: '#dc2626', fontSize: '24px', display: 'block', marginBottom: '8px' }}>❌</span>
+                    <p style={{ color: '#dc2626', fontWeight: '500', marginBottom: '4px' }}>Arquivo inválido</p>
                     <p style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Formatos aceitos: PDF, DOC, DOCX, TXT
+                      Clique para selecionar um arquivo válido
+                    </p>
+                    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                      Formatos aceitos: {uploadConfig.allowed_file_types ? uploadConfig.allowed_file_types.toUpperCase() : 'PDF, DOC, DOCX, TXT'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center' }}>
+                    <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>📁</span>
+                    <p style={{ fontWeight: '500', marginBottom: '4px' }}>Clique aqui ou arraste um arquivo</p>
+                    <p style={{ fontSize: '12px', color: '#6b7280' }}>
+                      Formatos aceitos: {uploadConfig.allowed_file_types ? uploadConfig.allowed_file_types.toUpperCase() : 'PDF, DOC, DOCX, TXT'}
+                    </p>
+                    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                      Tamanho máximo: {uploadConfig.max_file_size || 10}MB
                     </p>
                   </div>
                 )}
@@ -865,6 +1198,39 @@ const Documents = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Modal de Visualização */}
+      {showViewModal && (
+        <ViewModal onClick={handleCloseViewModal}>
+          <ViewModalContent onClick={(e) => e.stopPropagation()}>
+            <ViewModalHeader>
+              <ViewModalTitle>
+                {viewingDocument?.nome_arquivo || 'Visualizar Documento'}
+              </ViewModalTitle>
+              <ViewModalActions>
+                <Button
+                  size="sm"
+                  $variant="outline"
+                  onClick={handleDownloadDocument}
+                >
+                  <FaDownload style={{ marginRight: '8px' }} />
+                  Download
+                </Button>
+                <Button
+                  size="sm"
+                  $variant="outline"
+                  onClick={handleCloseViewModal}
+                >
+                  <FaTimes />
+                </Button>
+              </ViewModalActions>
+            </ViewModalHeader>
+            <ViewModalBody>
+              {renderDocumentContent()}
+            </ViewModalBody>
+          </ViewModalContent>
+        </ViewModal>
+      )}
     </PageContainer>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import styled, { css } from 'styled-components';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useApp } from '../../contexts/AppContext';
 import {
   BarChart3,
   Building2,
@@ -200,6 +201,7 @@ const CompanyPlan = styled.div`
 
 function Sidebar({ collapsed, mobileOpen, onClose }) {
   const { user, isAdmin, isCompanyAdmin } = useAuth();
+  const { appInfo } = useApp();
   const location = useLocation();
   
   const getMenuItems = () => {
@@ -313,7 +315,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
     >
       <SidebarHeader>
         <Logo>D</Logo>
-        <LogoText collapsed={collapsed}>DocGest</LogoText>
+        <LogoText collapsed={collapsed}>{appInfo?.app_name || 'DocGest'}</LogoText>
       </SidebarHeader>
       
       <Navigation>

@@ -43,7 +43,13 @@ export const publicApi = {
   getPublicPlans: () => api.get('/public/plans'),
   
   // Buscar plano público por ID
-  getPublicPlan: (id) => api.get(`/public/plans/${id}`)
+  getPublicPlan: (id) => api.get(`/public/plans/${id}`),
+  
+  // Buscar informações da aplicação
+  getAppInfo: () => api.get('/api/app-info'),
+  
+  // Buscar configurações de upload
+  getUploadConfig: () => api.get('/api/upload-config')
 };
 
 export default api;

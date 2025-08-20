@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Card from '../components/Card';
@@ -119,6 +120,7 @@ const Footer = styled.div`
 
 function Login() {
   const { user, login } = useAuth();
+  const { appInfo } = useApp();
   const [formData, setFormData] = useState({
     email: '',
     senha: ''
@@ -173,8 +175,8 @@ function Login() {
     <LoginContainer>
       <LoginCard>
         <LogoContainer>
-          <Logo>D</Logo>
-          <Title>DocGest</Title>
+          <Logo>{appInfo.app_name?.charAt(0) || 'D'}</Logo>
+          <Title>{appInfo.app_name}</Title>
           <Subtitle>Faça login para acessar sua conta</Subtitle>
         </LogoContainer>
         
@@ -232,7 +234,7 @@ function Login() {
         </SignupLink>
         
         <Footer>
-          © 2024 DocGest. Todos os direitos reservados.
+          © 2024 {appInfo?.app_name || 'DocGest'}. Todos os direitos reservados.
         </Footer>
       </LoginCard>
     </LoginContainer>

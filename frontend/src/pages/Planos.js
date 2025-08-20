@@ -5,6 +5,7 @@ import Button from '../components/Button';
 import LandingHeader from '../components/layout/LandingHeader';
 import { publicApi } from '../services/api';
 import { Check, Star, Zap, Building2 } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -244,6 +245,7 @@ const FooterText = styled.p`
 
 function Planos() {
   const navigate = useNavigate();
+  const { appInfo } = useApp();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -441,7 +443,7 @@ function Planos() {
 
       <Footer>
         <FooterText>
-          © 2024 DocGest. Todos os direitos reservados.
+          © 2024 {appInfo?.app_name || 'DocGest'}. Todos os direitos reservados.
         </FooterText>
       </Footer>
     </Container>

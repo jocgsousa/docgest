@@ -110,6 +110,7 @@ CREATE TABLE documentos (
     caminho_arquivo VARCHAR(500) NOT NULL,
     tamanho_arquivo BIGINT,
     tipo_arquivo VARCHAR(100),
+    hash_acesso VARCHAR(64) UNIQUE NOT NULL,
     status ENUM('rascunho','enviado','assinado','cancelado') DEFAULT 'rascunho',
     criado_por INT NOT NULL,
     empresa_id INT NOT NULL,
@@ -380,6 +381,58 @@ CREATE INDEX idx_notificacoes_destinatario ON notificacoes(usuario_destinatario_
 CREATE INDEX idx_notificacoes_empresa ON notificacoes(empresa_id);
 CREATE INDEX idx_notificacoes_lida ON notificacoes(lida);
 CREATE INDEX idx_notificacoes_tipo ON notificacoes(tipo);
+
+-- ================================================
+-- CONFIGURAÇÕES DO SISTEMA
+-- ================================================
+CREATE TABLE configuracoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    chave VARCHAR(100) NOT NULL UNIQUE,
+    valor TEXT,
+    tipo ENUM('string','number','boolean','json') DEFAULT 'string',
+    descricao TEXT,
+    categoria VARCHAR(50) DEFAULT 'geral',
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Índices para performance das configurações
+CREATE INDEX idx_configuracoes_chave ON configuracoes(chave);
+CREATE INDEX idx_configuracoes_categoria ON configuracoes(categoria);
+CREATE INDEX idx_configuracoes_ativo ON configuracoes(ativo);
+
+-- Inserção das configurações padrão
+INSERT INTO configuracoes (chave, valor, tipo, descricao, categoria) VALUES
+-- Configurações gerais
+('app_name', 'DocGest', 'string', 'Nome da aplicação', 'geral'),
+('max_file_size', '10', 'number', 'Tamanho máximo de arquivo em MB', 'geral'),
+('allowed_file_types', 'pdf,doc,docx,jpg,jpeg,png', 'string', 'Tipos de arquivo permitidos', 'geral'),
+
+-- Configurações de email
+('smtp_host', '', 'string', 'Servidor SMTP', 'email'),
+('smtp_port', '587', 'number', 'Porta SMTP', 'email'),
+('smtp_username', '', 'string', 'Usuário SMTP', 'email'),
+('smtp_password', '', 'string', 'Senha SMTP', 'email'),
+('smtp_from_email', '', 'string', 'Email remetente', 'email'),
+('smtp_from_name', '', 'string', 'Nome remetente', 'email'),
+
+-- Configurações de notificação
+('email_notifications', 'true', 'boolean', 'Notificações por email', 'notificacao'),
+('whatsapp_notifications', 'false', 'boolean', 'Notificações por WhatsApp', 'notificacao'),
+('signature_reminders', 'true', 'boolean', 'Lembretes de assinatura', 'notificacao'),
+('expiration_alerts', 'true', 'boolean', 'Alertas de expiração', 'notificacao'),
+
+-- Configurações de segurança
+('password_min_length', '8', 'number', 'Comprimento mínimo da senha', 'seguranca'),
+('require_password_complexity', 'true', 'boolean', 'Exigir complexidade de senha', 'seguranca'),
+('session_timeout', '24', 'number', 'Timeout de sessão em horas', 'seguranca'),
+('max_login_attempts', '5', 'number', 'Máximo de tentativas de login', 'seguranca'),
+
+-- Configurações de assinatura
+('signature_expiration_days', '30', 'number', 'Dias para expiração de assinatura', 'assinatura'),
+('auto_reminder_days', '7', 'number', 'Dias para lembrete automático', 'assinatura'),
+('max_signers_per_document', '10', 'number', 'Máximo de signatários por documento', 'assinatura');
 
 -- ================================================
 -- COMENTÁRIOS FINAIS

@@ -5,7 +5,7 @@ import api from '../services/api';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Input from '../components/Input';
-import NotificationManager from '../components/NotificationManager';
+
 
 const PageContainer = styled.div`
   padding: 24px;
@@ -125,7 +125,7 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
     // Configurações gerais
-    app_name: 'DocGest',
+    app_name: '',
     max_file_size: '10',
     allowed_file_types: 'pdf,doc,docx,jpg,jpeg,png',
     
@@ -162,10 +162,36 @@ const Settings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/settings');
-      setSettings(prev => ({ ...prev, ...response.data }));
+      
+      // Primeiro, buscar informações públicas da aplicação (não requer autenticação)
+      try {
+        const appInfoResponse = await api.get('/app-info');
+        if (appInfoResponse.data && appInfoResponse.data.data) {
+          setSettings(prev => ({ ...prev, ...appInfoResponse.data.data }));
+        }
+      } catch (appInfoError) {
+        console.warn('Erro ao buscar informações da aplicação:', appInfoError);
+      }
+      
+      // Depois, tentar buscar configurações completas (requer autenticação)
+      try {
+        const response = await api.get('/settings');
+        if (response.data && response.data.data) {
+          // Garantir que os dados da API sobrescrevam os valores padrão
+          setSettings(prev => {
+            const updatedSettings = { ...prev, ...response.data.data };
+            console.log('Configurações carregadas da API:', updatedSettings);
+            return updatedSettings;
+          });
+        }
+      } catch (settingsError) {
+        console.warn('Erro ao buscar configurações completas:', settingsError);
+        console.warn('Usando valores padrão para campos não carregados');
+        // Se falhar, manter os valores padrão já definidos no estado inicial
+      }
+      
     } catch (error) {
-      console.error('Erro ao buscar configurações:', error);
+      console.error('Erro geral ao buscar configurações:', error);
     } finally {
       setLoading(false);
     }
@@ -199,9 +225,8 @@ const Settings = () => {
   };
 
   const canManageSettings = user?.tipo_usuario === 1; // Apenas Super Admin
-  const canManageNotifications = user?.tipo_usuario === 1 || user?.tipo_usuario === 2; // Super Admin ou Admin Empresa
 
-  if (!canManageSettings && !canManageNotifications) {
+  if (!canManageSettings) {
     return (
       <PageContainer>
         <PageHeader>
@@ -427,13 +452,7 @@ const Settings = () => {
           />
         </SettingsSection>
 
-        {/* Gerenciamento de Notificações */}
-        {canManageNotifications && (
-          <SettingsSection>
-            <SectionTitle>Gerenciamento de Notificações</SectionTitle>
-            <NotificationManager />
-          </SettingsSection>
-        )}
+
       </SettingsGrid>
 
       {canManageSettings && (

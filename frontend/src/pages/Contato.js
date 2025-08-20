@@ -6,6 +6,7 @@ import Input from '../components/Input';
 import LandingHeader from '../components/layout/LandingHeader';
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle } from 'lucide-react';
 import api from '../services/api';
+import { useApp } from '../contexts/AppContext';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -219,6 +220,7 @@ const FooterText = styled.p`
 
 function Contato() {
   const navigate = useNavigate();
+  const { appInfo } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -291,7 +293,7 @@ function Contato() {
     {
       icon: <Mail size={20} />,
       label: 'E-mail',
-      text: 'contato@docgest.com.br\nsuporte@docgest.com.br'
+      text: 'contato@empresa.com.br\nsuporte@empresa.com.br'
     },
     {
       icon: <Phone size={20} />,
@@ -468,7 +470,7 @@ function Contato() {
 
       <Footer>
         <FooterText>
-          © 2024 DocGest. Todos os direitos reservados.
+          © 2024 {appInfo.app_name}. Todos os direitos reservados.
         </FooterText>
       </Footer>
     </Container>
