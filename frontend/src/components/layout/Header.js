@@ -571,9 +571,11 @@ function Header({
               <DropdownItem onClick={handleProfileClick}>
                 <User size={16} style={{ marginRight: '8px' }} /> Meu Perfil
               </DropdownItem>
-              <DropdownItem onClick={handleSettingsClick}>
-                <Settings size={16} style={{ marginRight: '8px' }} /> Configurações
-              </DropdownItem>
+              {user?.tipo_usuario === 1 && (
+                <DropdownItem onClick={handleSettingsClick}>
+                  <Settings size={16} style={{ marginRight: '8px' }} /> Configurações
+                </DropdownItem>
+              )}
               <DropdownItem onClick={handleLogout}>
                 <LogOut size={16} style={{ marginRight: '8px' }} /> Sair
               </DropdownItem>

@@ -149,6 +149,13 @@ class UserController {
                 }
                 // Forçar empresa do admin logado
                 $input['empresa_id'] = $currentUser['empresa_id'];
+                
+                // Verificar se o plano da empresa está vencido
+                require_once __DIR__ . '/../models/Company.php';
+                $companyModel = new Company();
+                if ($companyModel->isPlanExpired($currentUser['empresa_id'])) {
+                    Response::forbidden('Não é possível criar novos usuários. O plano da empresa está vencido.');
+                }
             }
             
             // Criar usuário

@@ -177,6 +177,16 @@ class DocumentController {
                 return;
             }
             
+            // Verificar se o plano da empresa está vencido (exceto para super admin)
+            if ($user['tipo_usuario'] != 1) {
+                require_once __DIR__ . '/../models/Company.php';
+                $companyModel = new Company();
+                if ($companyModel->isPlanExpired($user['empresa_id'])) {
+                    Response::forbidden('Não é possível criar novos documentos. O plano da empresa está vencido.');
+                    return;
+                }
+            }
+            
             // Validar e processar assinantes
             $assinantes = [];
             if (is_string($data['assinantes'])) {

@@ -27,7 +27,7 @@ const SidebarContainer = styled.aside.withConfig({
   top: 0;
   left: 0;
   height: 100vh;
-  width: ${props => props.collapsed ? '4rem' : '16rem'};
+  width: ${props => props.collapsed ? '4.7rem' : '16rem'};
   background-color: ${props => props.theme.colors.white};
   border-right: 1px solid ${props => props.theme.colors.gray[100]};
   transition: all 0.3s ease-in-out;

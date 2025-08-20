@@ -104,7 +104,8 @@ const Plans = () => {
     preco: '',
     limite_usuarios: '',
     limite_documentos: '',
-    limite_assinaturas: ''
+    limite_assinaturas: '',
+    dias: ''
   });
   const [filters, setFilters] = useState({
     search: ''
@@ -263,7 +264,9 @@ const Plans = () => {
       preco: planToEdit.preco.toString(),
       limite_usuarios: planToEdit.limite_usuarios.toString(),
       limite_documentos: planToEdit.limite_documentos.toString(),
-      limite_assinaturas: planToEdit.limite_assinaturas.toString()
+      limite_assinaturas: planToEdit.limite_assinaturas.toString(),
+      limite_armazenamento_mb: planToEdit.limite_armazenamento_mb ? planToEdit.limite_armazenamento_mb.toString() : '1024',
+      dias: planToEdit.dias ? planToEdit.dias.toString() : '30'
     });
     setShowModal(true);
   };
@@ -292,7 +295,9 @@ const Plans = () => {
       preco: '',
       limite_usuarios: '',
       limite_documentos: '',
-      limite_assinaturas: ''
+      limite_assinaturas: '',
+      limite_armazenamento_mb: '',
+      dias: ''
     });
     setErrors({});
   };
@@ -425,6 +430,28 @@ const Plans = () => {
               onChange={(e) => setFormData(prev => ({ ...prev, limite_assinaturas: e.target.value }))}
               error={errors.limite_assinaturas?.[0]}
               required
+            />
+            
+            <Input
+              label="Limite de Armazenamento (MB)"
+              type="number"
+              min="1"
+              value={formData.limite_armazenamento_mb}
+              onChange={(e) => setFormData(prev => ({ ...prev, limite_armazenamento_mb: e.target.value }))}
+              error={errors.limite_armazenamento_mb?.[0]}
+              required
+              placeholder="Ex: 1024"
+            />
+            
+            <Input
+              label="Dias de Vigência"
+              type="number"
+              min="1"
+              value={formData.dias}
+              onChange={(e) => setFormData(prev => ({ ...prev, dias: e.target.value }))}
+              error={errors.dias?.[0]}
+              required
+              placeholder="Ex: 30"
             />
           </FormGrid>
           

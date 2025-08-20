@@ -172,6 +172,13 @@ class BranchController {
                 Response::internalError('Plano da empresa não encontrado');
             }
             
+            // Verificar se o plano da empresa está vencido (exceto para super admin)
+            if ($user['tipo_usuario'] != 1) {
+                if ($companyModel->isPlanExpired($input['empresa_id'])) {
+                    Response::forbidden('Não é possível criar novas filiais. O plano da empresa está vencido.');
+                }
+            }
+            
             // Contar filiais atuais da empresa
             $currentBranches = $this->branchModel->countByCompany($input['empresa_id']);
             

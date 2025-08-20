@@ -16,6 +16,8 @@ CREATE TABLE planos (
     limite_documentos INT NOT NULL,
     limite_assinaturas INT NOT NULL,
     limite_filiais INT NOT NULL DEFAULT 1,
+    limite_armazenamento_mb INT NOT NULL DEFAULT 1024 COMMENT 'Limite de armazenamento em MB',
+    dias INT NOT NULL DEFAULT 30 COMMENT 'Número de dias de vigência do plano',
     ativo BOOLEAN DEFAULT TRUE,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -187,11 +189,11 @@ CREATE TABLE documento_assinantes (
 -- ================================================
 
 -- Planos padrão
-INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas, limite_filiais) VALUES
-('Plano Trial 5 Dias', 'Ideal para testes', 0, 5, 10, 10, 1),
-('Plano Básico', 'Ideal para pequenas empresas', 99.90, 5, 50, 100, 2),
-('Plano Profissional', 'Para empresas médias', 199.90, 15, 200, 500, 5),
-('Plano Enterprise', 'Para grandes empresas', 399.90, 50, 1000, 2000, 999999);
+INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas, limite_filiais, limite_armazenamento_mb, dias) VALUES
+('Plano Trial 5 Dias', 'Ideal para testes', 0, 5, 10, 10, 1, 100, 5),
+('Plano Básico', 'Ideal para pequenas empresas', 99.90, 5, 50, 100, 2, 1024, 30),
+('Plano Profissional', 'Para empresas médias', 199.90, 15, 200, 500, 5, 5120, 30),
+('Plano Enterprise', 'Para grandes empresas', 399.90, 50, 1000, 2000, 999999, 51200, 365);
 
 -- Profissões padrão
 INSERT INTO profissoes (nome, descricao) VALUES

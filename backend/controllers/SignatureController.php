@@ -125,6 +125,16 @@ class SignatureController {
                 }
             }
             
+            // Verificar se o plano da empresa está vencido (exceto para super admin)
+            if ($user['tipo_usuario'] != 1) {
+                require_once __DIR__ . '/../models/Company.php';
+                $companyModel = new Company();
+                if ($companyModel->isPlanExpired($user['empresa_id'])) {
+                    Response::forbidden('Não é possível criar novas assinaturas. O plano da empresa está vencido.');
+                    return;
+                }
+            }
+            
             // Verificar se o documento já tem uma assinatura ativa
             $existingSignatures = $this->signature->findAll(['documento_id' => $input['documento_id']], 1, 1);
             if (!empty($existingSignatures['data'])) {

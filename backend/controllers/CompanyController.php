@@ -98,9 +98,12 @@ class CompanyController {
                 ->email('email', 'Email deve ser válido')
                 ->required('telefone', 'Telefone é obrigatório')
                 ->required('plano_id', 'Plano é obrigatório')
-                ->exists('plano_id', 'planos', 'id', 'Plano não encontrado')
-                ->required('data_vencimento', 'Data de vencimento é obrigatória')
-                ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
+                ->exists('plano_id', 'planos', 'id', 'Plano não encontrado');
+            
+            // Data de vencimento é opcional - será calculada automaticamente se não fornecida
+            if (isset($input['data_vencimento']) && !empty($input['data_vencimento'])) {
+                $validator->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
+            }
             
             // Validação opcional do código da empresa
             if (isset($input['codigo_empresa']) && !empty($input['codigo_empresa'])) {
@@ -128,6 +131,12 @@ class CompanyController {
                 }
             }
             
+            // Calcular data de vencimento automaticamente se não fornecida
+            $dataVencimento = $input['data_vencimento'] ?? null;
+            if (empty($dataVencimento)) {
+                $dataVencimento = $this->companyModel->calculateNewExpirationDate($input['plano_id']);
+            }
+            
             // Criar empresa
             $companyData = [
                 'nome' => $input['nome'],
@@ -139,7 +148,7 @@ class CompanyController {
                 'estado' => $input['estado'] ?? null,
                 'cep' => isset($input['cep']) ? preg_replace('/[^0-9]/', '', $input['cep']) : null,
                 'plano_id' => $input['plano_id'],
-                'data_vencimento' => $input['data_vencimento']
+                'data_vencimento' => $dataVencimento
             ];
             
             // Adicionar código da empresa se fornecido
@@ -153,7 +162,12 @@ class CompanyController {
                 Response::error('Erro ao criar empresa', 500);
             }
             
-            Response::created($company, 'Empresa criada com sucesso');
+            $message = 'Empresa criada com sucesso';
+            if (empty($input['data_vencimento'])) {
+                $message .= '. A data de vencimento foi calculada automaticamente baseada nos dias do plano selecionado.';
+            }
+            
+            Response::created($company, $message);
             
         } catch (Exception $e) {
             Response::handleException($e);
@@ -262,13 +276,21 @@ class CompanyController {
                 }
             }
             
+            // Verificar se o plano está sendo alterado para informar sobre recálculo da data de vencimento
+            $planChanged = isset($updateData['plano_id']) && !isset($updateData['data_vencimento']);
+            
             $updatedCompany = $this->companyModel->update($id, $updateData);
             
             if (!$updatedCompany) {
                 Response::error('Erro ao atualizar empresa', 500);
             }
             
-            Response::updated($updatedCompany, 'Empresa atualizada com sucesso');
+            $message = 'Empresa atualizada com sucesso';
+            if ($planChanged) {
+                $message .= '. A data de vencimento foi recalculada automaticamente baseada nos dias do novo plano.';
+            }
+            
+            Response::updated($updatedCompany, $message);
             
         } catch (Exception $e) {
             Response::handleException($e);

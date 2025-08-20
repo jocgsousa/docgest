@@ -83,7 +83,11 @@ class PlanController {
                 ->required('limite_documentos', 'Limite de documentos é obrigatório')
                 ->integer('limite_documentos', 'Limite de documentos deve ser um número inteiro')
                 ->required('limite_assinaturas', 'Limite de assinaturas é obrigatório')
-                ->integer('limite_assinaturas', 'Limite de assinaturas deve ser um número inteiro');
+                ->integer('limite_assinaturas', 'Limite de assinaturas deve ser um número inteiro')
+                ->required('limite_armazenamento_mb', 'Limite de armazenamento é obrigatório')
+                ->integer('limite_armazenamento_mb', 'Limite de armazenamento deve ser um número inteiro')
+                ->required('dias', 'Número de dias é obrigatório')
+                ->integer('dias', 'Número de dias deve ser um número inteiro');
             
             // Validar preço se fornecido
             if (isset($input['preco'])) {
@@ -114,6 +118,18 @@ class PlanController {
                 Response::validation(['limite_assinaturas' => ['Limite de assinaturas deve ser maior que zero']]);
             }
             
+            if (isset($input['limite_filiais']) && $input['limite_filiais'] < 1) {
+                Response::validation(['limite_filiais' => ['Limite de filiais deve ser maior que zero']]);
+            }
+            
+            if ($input['dias'] < 1) {
+                Response::validation(['dias' => ['Número de dias deve ser maior que zero']]);
+            }
+            
+            if ($input['limite_armazenamento_mb'] < 1) {
+                Response::validation(['limite_armazenamento_mb' => ['Limite de armazenamento deve ser maior que zero']]);
+            }
+            
             // Criar plano
             $planData = [
                 'nome' => $input['nome'],
@@ -121,7 +137,10 @@ class PlanController {
                 'preco' => $input['preco'] ?? 0, // Padrão para plano gratuito
                 'limite_usuarios' => $input['limite_usuarios'],
                 'limite_documentos' => $input['limite_documentos'],
-                'limite_assinaturas' => $input['limite_assinaturas']
+                'limite_assinaturas' => $input['limite_assinaturas'],
+                'limite_filiais' => $input['limite_filiais'] ?? 1,
+                'limite_armazenamento_mb' => $input['limite_armazenamento_mb'],
+                'dias' => $input['dias']
             ];
             
             $plan = $this->planModel->create($planData);
@@ -176,6 +195,18 @@ class PlanController {
                 $validator->integer('limite_assinaturas', 'Limite de assinaturas deve ser um número inteiro');
             }
             
+            if (isset($input['limite_filiais'])) {
+                $validator->integer('limite_filiais', 'Limite de filiais deve ser um número inteiro');
+            }
+            
+            if (isset($input['dias'])) {
+                $validator->integer('dias', 'Número de dias deve ser um número inteiro');
+            }
+            
+            if (isset($input['limite_armazenamento_mb'])) {
+                $validator->integer('limite_armazenamento_mb', 'Limite de armazenamento deve ser um número inteiro');
+            }
+            
 
             
             // Verificar unicidade de nome
@@ -202,9 +233,21 @@ class PlanController {
                 Response::validation(['limite_assinaturas' => ['Limite de assinaturas deve ser maior que zero']]);
             }
             
+            if (isset($input['limite_filiais']) && $input['limite_filiais'] < 1) {
+                Response::validation(['limite_filiais' => ['Limite de filiais deve ser maior que zero']]);
+            }
+            
+            if (isset($input['dias']) && $input['dias'] < 1) {
+                Response::validation(['dias' => ['Número de dias deve ser maior que zero']]);
+            }
+            
+            if (isset($input['limite_armazenamento_mb']) && $input['limite_armazenamento_mb'] < 1) {
+                Response::validation(['limite_armazenamento_mb' => ['Limite de armazenamento deve ser maior que zero']]);
+            }
+            
             // Preparar dados para atualização
             $updateData = [];
-            $allowedFields = ['nome', 'descricao', 'preco', 'limite_usuarios', 'limite_documentos', 'limite_assinaturas'];
+            $allowedFields = ['nome', 'descricao', 'preco', 'limite_usuarios', 'limite_documentos', 'limite_assinaturas', 'limite_filiais', 'limite_armazenamento_mb', 'dias'];
             
             foreach ($allowedFields as $field) {
                 if (isset($input[$field])) {

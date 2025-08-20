@@ -158,6 +158,14 @@ class Company {
         
         $allowedFields = ['nome', 'cnpj', 'codigo_empresa', 'email', 'telefone', 'endereco', 'cidade', 'estado', 'cep', 'plano_id', 'data_vencimento'];
         
+        // Se o plano_id está sendo alterado, recalcular data de vencimento automaticamente
+        if (isset($data['plano_id']) && !isset($data['data_vencimento'])) {
+            $newExpirationDate = $this->calculateNewExpirationDate($data['plano_id']);
+            if ($newExpirationDate) {
+                $data['data_vencimento'] = $newExpirationDate;
+            }
+        }
+        
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
                 $fields[] = "$field = :$field";
@@ -441,6 +449,50 @@ class Company {
         }
         
         return $result;
+    }
+    
+    /**
+     * Calcula nova data de vencimento baseada nos dias do plano
+     */
+    public function calculateNewExpirationDate($planId) {
+        // Buscar o plano
+        $sql = "SELECT dias FROM planos WHERE id = :plano_id AND ativo = 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':plano_id', $planId, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        $plan = $stmt->fetch();
+        
+        if (!$plan || !$plan['dias']) {
+            return null;
+        }
+        
+        // Calcular nova data de vencimento
+        // Subtrai 1 dia porque o dia atual já conta como o primeiro dia
+        $today = new DateTime();
+        $expirationDate = clone $today;
+        $expirationDate->add(new DateInterval('P' . ($plan['dias'] - 1) . 'D'));
+        
+        return $expirationDate->format('Y-m-d');
+    }
+    
+    /**
+     * Verifica se o plano da empresa está vencido
+     */
+    public function isPlanExpired($empresaId) {
+        $sql = "SELECT data_vencimento FROM empresas WHERE id = :empresa_id AND ativo = 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':empresa_id' => $empresaId]);
+        $empresa = $stmt->fetch();
+        
+        if (!$empresa) {
+            return true; // Se empresa não encontrada, considerar vencido
+        }
+        
+        $today = new DateTime();
+        $dataVencimento = new DateTime($empresa['data_vencimento']);
+        
+        return $dataVencimento < $today;
     }
 }
 

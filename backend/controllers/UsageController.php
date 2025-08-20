@@ -4,18 +4,21 @@ require_once __DIR__ . '/../utils/JWT.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../models/Company.php';
 require_once __DIR__ . '/../models/Document.php';
+require_once __DIR__ . '/../models/Plan.php';
 require_once __DIR__ . '/../models/Signature.php';
 require_once __DIR__ . '/../models/User.php';
 
 class UsageController {
     private $companyModel;
     private $documentModel;
+    private $planModel;
     private $signatureModel;
     private $userModel;
     
     public function __construct() {
         $this->companyModel = new Company();
         $this->documentModel = new Document();
+        $this->planModel = new Plan();
         $this->signatureModel = new Signature();
         $this->userModel = new User();
     }
@@ -43,14 +46,25 @@ class UsageController {
                 return;
             }
             
-            // Calcular dias restantes no mês
+            // Buscar dados da empresa para obter data de vencimento
+            $empresa = $this->companyModel->findById($empresaId);
+            
+            // Calcular dias restantes baseado na vigência do plano
             $today = new DateTime();
-            $lastDayOfMonth = new DateTime($today->format('Y-m-t'));
-            $daysRemaining = $today->diff($lastDayOfMonth)->days + 1;
+            $dataVencimento = new DateTime($empresa['data_vencimento']);
+            $daysRemaining = max(0, $today->diff($dataVencimento)->days);
+            
+            // Se a data de vencimento já passou, dias restantes = 0
+            if ($dataVencimento < $today) {
+                $daysRemaining = 0;
+            }
             
             // Calcular uso de armazenamento (simulado - pode ser implementado futuramente)
             $storageUsedMb = $this->calculateStorageUsage($empresaId);
             $storageLimitMb = 1000; // 1GB padrão - pode vir do plano
+            
+            // Buscar informações do plano
+            $plano = $this->planModel->findById($empresa['plano_id']);
             
             // Montar resposta no formato esperado pelo frontend
             $response = [
@@ -68,8 +82,12 @@ class UsageController {
                     'whatsapp_messages_per_month' => 1000 // Padrão
                 ],
                 'days_remaining' => $daysRemaining,
-                'plan_name' => 'Plano Atual', // Pode buscar do banco
-                'billing_cycle' => 'monthly'
+                'plan_name' => $plano ? $plano['nome'] : 'Plano Atual',
+                'plan_days' => $plano ? (int)$plano['dias'] : 30,
+                'period_start' => $empresa['data_criacao'],
+                'period_end' => $empresa['data_vencimento'],
+                'billing_cycle' => 'plan_based',
+                'plan_expired' => $daysRemaining === 0
             ];
             
             Response::success($response, 'Dados de uso recuperados com sucesso');

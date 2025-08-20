@@ -91,8 +91,8 @@ class Plan {
      * Cria novo plano
      */
     public function create($data) {
-        $sql = "INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas)
-                VALUES (:nome, :descricao, :preco, :limite_usuarios, :limite_documentos, :limite_assinaturas)";
+        $sql = "INSERT INTO planos (nome, descricao, preco, limite_usuarios, limite_documentos, limite_assinaturas, limite_filiais, limite_armazenamento_mb, dias)
+                VALUES (:nome, :descricao, :preco, :limite_usuarios, :limite_documentos, :limite_assinaturas, :limite_filiais, :limite_armazenamento_mb, :dias)";
         
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':nome', $data['nome']);
@@ -101,6 +101,9 @@ class Plan {
         $stmt->bindValue(':limite_usuarios', $data['limite_usuarios']);
         $stmt->bindValue(':limite_documentos', $data['limite_documentos']);
         $stmt->bindValue(':limite_assinaturas', $data['limite_assinaturas']);
+        $stmt->bindValue(':limite_filiais', $data['limite_filiais'] ?? 1);
+        $stmt->bindValue(':limite_armazenamento_mb', $data['limite_armazenamento_mb'] ?? 1024);
+        $stmt->bindValue(':dias', $data['dias'] ?? 30);
         
         if ($stmt->execute()) {
             $id = $this->db->lastInsertId();
@@ -117,7 +120,7 @@ class Plan {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['nome', 'descricao', 'preco', 'limite_usuarios', 'limite_documentos', 'limite_assinaturas'];
+        $allowedFields = ['nome', 'descricao', 'preco', 'limite_usuarios', 'limite_documentos', 'limite_assinaturas', 'limite_filiais', 'limite_armazenamento_mb', 'dias'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {

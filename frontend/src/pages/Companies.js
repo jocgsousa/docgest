@@ -59,7 +59,9 @@ const StatusBadge = styled.span`
   
   ${props => {
     const today = new Date();
-    const vencimento = new Date(props.date);
+    // Evitar problemas de timezone ao criar a data
+    const [year, month, day] = props.date.split('-');
+    const vencimento = new Date(year, month - 1, day); // month é 0-indexed
     const diffTime = vencimento - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
@@ -143,7 +145,9 @@ const Companies = ({ openCreateModal = false }) => {
       key: 'data_vencimento',
       title: 'Vencimento',
       render: (value) => {
-        const date = new Date(value);
+        // Evitar problemas de timezone ao criar a data
+        const [year, month, day] = value.split('-');
+        const date = new Date(year, month - 1, day); // month é 0-indexed
         const today = new Date();
         const diffTime = date - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -368,6 +372,29 @@ const Companies = ({ openCreateModal = false }) => {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
+  // Função para calcular data de vencimento baseada no plano
+  const calculateExpirationDate = (planId) => {
+    const selectedPlan = plans.find(plan => plan.id === parseInt(planId));
+    if (selectedPlan && selectedPlan.dias) {
+      const today = new Date();
+      const expirationDate = new Date(today);
+      // Subtrai 1 dia porque o dia atual já conta como o primeiro dia
+      expirationDate.setDate(today.getDate() + selectedPlan.dias - 1);
+      return expirationDate.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    }
+    return '';
+  };
+
+  // Função para lidar com mudança de plano
+  const handlePlanChange = (planId) => {
+    setFormData(prev => ({
+      ...prev,
+      plano_id: planId,
+      // Sempre recalcula a data de vencimento quando o plano é alterado
+      data_vencimento: calculateExpirationDate(planId)
+    }));
+  };
+
   const handlePageChange = (page) => {
     setPagination(prev => ({ ...prev, page }));
   };
@@ -517,7 +544,7 @@ const Companies = ({ openCreateModal = false }) => {
                 </label>
                 <select
                   value={formData.plano_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, plano_id: e.target.value }))}
+                  onChange={(e) => handlePlanChange(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -549,7 +576,7 @@ const Companies = ({ openCreateModal = false }) => {
                 value={formData.data_vencimento}
                 onChange={(e) => setFormData(prev => ({ ...prev, data_vencimento: e.target.value }))}
                 error={errors.data_vencimento?.[0]}
-                required
+                placeholder="Será calculada automaticamente baseada no plano"
               />
             )}
           </FormGrid>
