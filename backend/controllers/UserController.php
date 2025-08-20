@@ -30,6 +30,9 @@ class UserController {
                 $filters['empresa_id'] = $currentUser['empresa_id'];
             }
             
+            // Excluir o usuário atual da listagem
+            $filters['exclude_user_id'] = $currentUser['user_id'];
+            
             // Filtros opcionais
             if (isset($_GET['empresa_id']) && $currentUser['tipo_usuario'] == 1) {
                 $filters['empresa_id'] = $_GET['empresa_id'];

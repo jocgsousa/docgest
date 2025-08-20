@@ -322,7 +322,7 @@ function LandingPage() {
 
       <FeaturesSection>
         <SectionContainer>
-          <SectionTitle>Por que escolher o {appInfo?.app_name || 'DocGest'}?</SectionTitle>
+          <SectionTitle>Por que escolher o {appInfo?.app_name || ''}?</SectionTitle>
           <SectionSubtitle>
             Nossa plataforma oferece todas as ferramentas necessárias para modernizar 
             a gestão de documentos da sua empresa

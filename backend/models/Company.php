@@ -97,15 +97,41 @@ class Company {
     }
     
     /**
+     * Gera código único para empresa
+     */
+    private function generateCompanyCode() {
+        do {
+            // Gera código no formato EMP + 3 dígitos aleatórios
+            $code = 'EMP' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
+            
+            // Verifica se já existe
+            $sql = "SELECT COUNT(*) as count FROM empresas WHERE codigo_empresa = :codigo";
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindValue(':codigo', $code);
+            $stmt->execute();
+            $result = $stmt->fetch();
+            
+        } while ($result['count'] > 0);
+        
+        return $code;
+    }
+    
+    /**
      * Cria nova empresa
      */
     public function create($data) {
-        $sql = "INSERT INTO empresas (nome, cnpj, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento)
-                VALUES (:nome, :cnpj, :email, :telefone, :endereco, :cidade, :estado, :cep, :plano_id, :data_vencimento)";
+        // Gera código automaticamente se não fornecido
+        $codigoEmpresa = isset($data['codigo_empresa']) && !empty($data['codigo_empresa']) 
+            ? $data['codigo_empresa'] 
+            : $this->generateCompanyCode();
+        
+        $sql = "INSERT INTO empresas (nome, cnpj, codigo_empresa, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento)
+                VALUES (:nome, :cnpj, :codigo_empresa, :email, :telefone, :endereco, :cidade, :estado, :cep, :plano_id, :data_vencimento)";
         
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':nome', $data['nome']);
         $stmt->bindValue(':cnpj', $data['cnpj']);
+        $stmt->bindValue(':codigo_empresa', $codigoEmpresa);
         $stmt->bindValue(':email', $data['email']);
         $stmt->bindValue(':telefone', $data['telefone']);
         $stmt->bindValue(':endereco', $data['endereco'] ?? null);
@@ -130,7 +156,7 @@ class Company {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['nome', 'cnpj', 'email', 'telefone', 'endereco', 'cidade', 'estado', 'cep', 'plano_id', 'data_vencimento'];
+        $allowedFields = ['nome', 'cnpj', 'codigo_empresa', 'email', 'telefone', 'endereco', 'cidade', 'estado', 'cep', 'plano_id', 'data_vencimento'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
@@ -200,6 +226,29 @@ class Company {
         
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':email', $email);
+        
+        if ($excludeId) {
+            $stmt->bindValue(':exclude_id', $excludeId, PDO::PARAM_INT);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->fetch();
+        
+        return $result['count'] > 0;
+    }
+    
+    /**
+     * Verifica se código da empresa já existe
+     */
+    public function codigoEmpresaExists($codigo, $excludeId = null) {
+        $sql = "SELECT COUNT(*) as count FROM empresas WHERE codigo_empresa = :codigo AND ativo = 1";
+        
+        if ($excludeId) {
+            $sql .= " AND id != :exclude_id";
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':codigo', $codigo);
         
         if ($excludeId) {
             $stmt->bindValue(':exclude_id', $excludeId, PDO::PARAM_INT);
@@ -297,7 +346,7 @@ class Company {
      * Lista todas as empresas ativas (para selects)
      */
     public function listAll() {
-        $sql = "SELECT id, nome, cnpj FROM empresas WHERE ativo = 1 ORDER BY nome";
+        $sql = "SELECT id, nome, cnpj, codigo_empresa FROM empresas WHERE ativo = 1 ORDER BY nome";
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
         
@@ -308,7 +357,7 @@ class Company {
      * Lista empresa específica do usuário (para selects)
      */
     public function listByUser($empresaId) {
-        $sql = "SELECT id, nome, cnpj FROM empresas WHERE id = :empresa_id AND ativo = 1";
+        $sql = "SELECT id, nome, cnpj, codigo_empresa FROM empresas WHERE id = :empresa_id AND ativo = 1";
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
         $stmt->execute();

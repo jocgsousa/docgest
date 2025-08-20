@@ -67,12 +67,12 @@ const StatusBadge = styled.span`
   `}
 `;
 
-function Branches() {
+function Branches({ openCreateModal = false }) {
   const { user } = useAuth();
   const { refreshAll } = useData();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(openCreateModal);
   const [editingBranch, setEditingBranch] = useState(null);
   const [formData, setFormData] = useState({
     empresa_id: '',

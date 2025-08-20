@@ -314,8 +314,9 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
       onClick={(e) => e.stopPropagation()}
     >
       <SidebarHeader>
-        <Logo>D</Logo>
-        <LogoText collapsed={collapsed}>{appInfo?.app_name || 'DocGest'}</LogoText>
+        <Logo>{appInfo ? String(appInfo.app_name).charAt(0) : 'D'}</Logo>
+
+        <LogoText collapsed={collapsed}>{appInfo?.app_name || ''}</LogoText>
       </SidebarHeader>
       
       <Navigation>

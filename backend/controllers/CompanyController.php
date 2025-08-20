@@ -102,6 +102,12 @@ class CompanyController {
                 ->required('data_vencimento', 'Data de vencimento é obrigatória')
                 ->date('data_vencimento', 'Y-m-d', 'Data de vencimento deve ser uma data válida');
             
+            // Validação opcional do código da empresa
+            if (isset($input['codigo_empresa']) && !empty($input['codigo_empresa'])) {
+                $validator->min('codigo_empresa', 3, 'Código da empresa deve ter pelo menos 3 caracteres')
+                         ->max('codigo_empresa', 10, 'Código da empresa deve ter no máximo 10 caracteres');
+            }
+            
 
             
             // Verificar se CNPJ já existe
@@ -113,6 +119,13 @@ class CompanyController {
             // Verificar se email já existe
             if ($this->companyModel->emailExists($input['email'])) {
                 Response::validation(['email' => ['Este email já está em uso']]);
+            }
+            
+            // Verificar se código da empresa já existe (se fornecido)
+            if (isset($input['codigo_empresa']) && !empty($input['codigo_empresa'])) {
+                if ($this->companyModel->codigoEmpresaExists($input['codigo_empresa'])) {
+                    Response::validation(['codigo_empresa' => ['Este código de empresa já está em uso']]);
+                }
             }
             
             // Criar empresa
@@ -128,6 +141,11 @@ class CompanyController {
                 'plano_id' => $input['plano_id'],
                 'data_vencimento' => $input['data_vencimento']
             ];
+            
+            // Adicionar código da empresa se fornecido
+            if (isset($input['codigo_empresa']) && !empty($input['codigo_empresa'])) {
+                $companyData['codigo_empresa'] = $input['codigo_empresa'];
+            }
             
             $company = $this->companyModel->create($companyData);
             
@@ -178,6 +196,11 @@ class CompanyController {
                 $validator->email('email', 'Email deve ser válido');
             }
             
+            if (isset($input['codigo_empresa'])) {
+                $validator->min('codigo_empresa', 3, 'Código da empresa deve ter pelo menos 3 caracteres')
+                         ->max('codigo_empresa', 10, 'Código da empresa deve ter no máximo 10 caracteres');
+            }
+            
             if (isset($input['plano_id'])) {
                 $validator->exists('plano_id', 'planos', 'id', 'Plano não encontrado');
                 
@@ -213,9 +236,15 @@ class CompanyController {
                 }
             }
             
+            if (isset($input['codigo_empresa'])) {
+                if ($this->companyModel->codigoEmpresaExists($input['codigo_empresa'], $id)) {
+                    Response::validation(['codigo_empresa' => ['Este código de empresa já está em uso']]);
+                }
+            }
+            
             // Preparar dados para atualização
             $updateData = [];
-            $allowedFields = ['nome', 'cnpj', 'email', 'telefone', 'endereco', 'cidade', 'estado', 'cep'];
+            $allowedFields = ['nome', 'cnpj', 'codigo_empresa', 'email', 'telefone', 'endereco', 'cidade', 'estado', 'cep'];
             
             // Super admin pode alterar plano e data de vencimento
             if ($currentUser['tipo_usuario'] == 1) {

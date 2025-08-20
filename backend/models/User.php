@@ -15,7 +15,7 @@ class User {
      * Busca usuário por email
      */
     public function findByEmail($email) {
-        $sql = "SELECT u.*, e.nome as empresa_nome, e.cnpj as empresa_cnpj, 
+        $sql = "SELECT u.*, e.nome as empresa_nome, e.cnpj as empresa_cnpj, e.codigo_empresa,
                        f.nome as filial_nome, p.nome as plano_nome
                 FROM {$this->table} u
                 LEFT JOIN empresas e ON u.empresa_id = e.id
@@ -34,7 +34,7 @@ class User {
      * Busca usuário por ID
      */
     public function findById($id) {
-        $sql = "SELECT u.*, e.nome as empresa_nome, e.cnpj as empresa_cnpj, 
+        $sql = "SELECT u.*, e.nome as empresa_nome, e.cnpj as empresa_cnpj, e.codigo_empresa,
                        f.nome as filial_nome, p.nome as plano_nome
                 FROM {$this->table} u
                 LEFT JOIN empresas e ON u.empresa_id = e.id
@@ -75,6 +75,11 @@ class User {
         if (!empty($filters['search'])) {
             $where[] = '(u.nome LIKE :search OR u.email LIKE :search)';
             $params[':search'] = '%' . $filters['search'] . '%';
+        }
+        
+        if (!empty($filters['exclude_user_id'])) {
+            $where[] = 'u.id != :exclude_user_id';
+            $params[':exclude_user_id'] = $filters['exclude_user_id'];
         }
         
         $whereClause = implode(' AND ', $where);

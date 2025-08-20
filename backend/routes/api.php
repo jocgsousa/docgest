@@ -702,6 +702,27 @@ try {
             }
             break;
             
+        // Rotas de Uso/Usage
+        case 'usage':
+            require_once __DIR__ . '/../controllers/UsageController.php';
+            $controller = new UsageController();
+            
+            switch ($method) {
+                case 'GET':
+                    if ($id === 'current') {
+                        $controller->current();
+                    } elseif ($id === 'history') {
+                        $controller->history();
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                default:
+                    Response::error('Método não permitido', 405);
+            }
+            break;
+            
         default:
             Response::notFound('Recurso não encontrado');
     }

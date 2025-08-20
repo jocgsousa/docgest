@@ -220,12 +220,12 @@ const DownloadMessage = styled.div`
   }
 `;
 
-const Documents = () => {
+const Documents = ({ openCreateModal = false }) => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(openCreateModal);
   const [editingDocument, setEditingDocument] = useState(null);
   const [formData, setFormData] = useState({ 
     titulo: '', 

@@ -92,6 +92,7 @@ const Companies = ({ openCreateModal = false }) => {
   const [formData, setFormData] = useState({
     nome: '',
     cnpj: '',
+    codigo_empresa: '',
     email: '',
     telefone: '',
     endereco: '',
@@ -117,6 +118,11 @@ const Companies = ({ openCreateModal = false }) => {
     {
       key: 'nome',
       title: 'Nome',
+      sortable: true
+    },
+    {
+      key: 'codigo_empresa',
+      title: 'Código',
       sortable: true
     },
     {
@@ -283,6 +289,7 @@ const Companies = ({ openCreateModal = false }) => {
     setFormData({
       nome: companyToEdit.nome,
       cnpj: companyToEdit.cnpj,
+      codigo_empresa: companyToEdit.codigo_empresa || '',
       email: companyToEdit.email,
       telefone: companyToEdit.telefone,
       endereco: companyToEdit.endereco || '',
@@ -343,6 +350,7 @@ const Companies = ({ openCreateModal = false }) => {
     setFormData({
       nome: '',
       cnpj: '',
+      codigo_empresa: '',
       email: '',
       telefone: '',
       endereco: '',
@@ -451,6 +459,17 @@ const Companies = ({ openCreateModal = false }) => {
               error={errors.cnpj?.[0]}
               required
             />
+            
+            {user?.tipo_usuario === 1 && (
+              <Input
+                label="Código da Empresa"
+                value={formData.codigo_empresa}
+                onChange={(e) => setFormData(prev => ({ ...prev, codigo_empresa: e.target.value }))}
+                error={errors.codigo_empresa?.[0]}
+                placeholder="Ex: EMP001"
+                maxLength="10"
+              />
+            )}
             
             <Input
               label="Email"

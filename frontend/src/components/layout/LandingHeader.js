@@ -169,8 +169,8 @@ function LandingHeader() {
     <HeaderContainer>
       <LeftSection>
         <LogoContainer to="/">
-          <Logo>D</Logo>
-          <LogoText>{appInfo?.app_name || 'DocGest'}</LogoText>
+          <Logo>{appInfo ? String(appInfo.app_name).charAt(0) : ''}</Logo>
+          <LogoText>{appInfo?.app_name || ''}</LogoText>
         </LogoContainer>
         
         <Navigation>

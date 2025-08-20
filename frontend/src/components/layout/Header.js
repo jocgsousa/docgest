@@ -72,6 +72,28 @@ const PageTitle = styled.h1`
   }
 `;
 
+const CompanyInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  margin-left: 1rem;
+  
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
+const CompanyName = styled.span`
+  font-size: 1rem;
+  font-weight: 500;
+  color: ${props => props.theme.colors.primary[600]};
+`;
+
+const CompanyCode = styled.span`
+  font-size: 1rem;
+  color: ${props => props.theme.colors.gray[600]};
+  font-family: monospace;
+`;
+
 const RightSection = styled.div`
   display: flex;
   align-items: center;
@@ -474,7 +496,12 @@ function Header({
           {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </MenuButton>
         
-        <PageTitle>{title || appInfo.app_name}</PageTitle>
+        {(user?.tipo_usuario === 2) && user?.empresa_nome && user?.codigo_empresa && (
+          <CompanyInfo>
+            <CompanyName>{user.empresa_nome}</CompanyName>
+            <CompanyCode>Código: {user.codigo_empresa}</CompanyCode>
+          </CompanyInfo>
+        )}
       </LeftSection>
       
       <RightSection>

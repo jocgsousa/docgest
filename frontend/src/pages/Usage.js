@@ -157,6 +157,7 @@ function Usage() {
     days_remaining: 0
   });
   const [history, setHistory] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [error, setError] = useState('');
@@ -200,19 +201,21 @@ function Usage() {
   };
 
   const getAlerts = () => {
-    const alerts = [];
+    const alertsArray = [];
     const { current_period, limits } = usage;
+
+    if (!current_period || !limits) return alertsArray;
 
     // Verificar documentos
     const docPercentage = calculatePercentage(current_period.documents_sent, limits.documents_per_month);
     if (docPercentage > 90) {
-      alerts.push({
+      alertsArray.push({
         type: 'danger',
         title: 'Limite de documentos quase atingido',
         text: `Você já enviou ${current_period.documents_sent} de ${limits.documents_per_month} documentos este mês.`
       });
     } else if (docPercentage > 75) {
-      alerts.push({
+      alertsArray.push({
         type: 'warning',
         title: 'Atenção ao limite de documentos',
         text: `Você já enviou ${current_period.documents_sent} de ${limits.documents_per_month} documentos este mês.`
@@ -222,23 +225,27 @@ function Usage() {
     // Verificar armazenamento
     const storagePercentage = calculatePercentage(current_period.storage_used_mb, limits.storage_limit_mb);
     if (storagePercentage > 90) {
-      alerts.push({
+      alertsArray.push({
         type: 'danger',
         title: 'Armazenamento quase esgotado',
         text: `Você está usando ${formatBytes(current_period.storage_used_mb * 1024 * 1024)} de ${formatBytes(limits.storage_limit_mb * 1024 * 1024)}.`
       });
     } else if (storagePercentage > 75) {
-      alerts.push({
+      alertsArray.push({
         type: 'warning',
         title: 'Atenção ao armazenamento',
         text: `Você está usando ${formatBytes(current_period.storage_used_mb * 1024 * 1024)} de ${formatBytes(limits.storage_limit_mb * 1024 * 1024)}.`
       });
     }
 
-    return alerts;
+    return alertsArray;
   };
 
-  const alerts = getAlerts();
+  useEffect(() => {
+    if (usage && usage.current_period && usage.limits) {
+      setAlerts(getAlerts());
+    }
+  }, [usage]);
 
   if (loading && !usage.current_period) {
     return (
@@ -264,7 +271,7 @@ function Usage() {
             }}
           >
             <option value="">Mês atual</option>
-            {history.map((item) => (
+            {history && history.length > 0 && history.map((item) => (
               <option key={item.month} value={item.month}>
                 {new Date(item.month + '-01').toLocaleDateString('pt-BR', { 
                   year: 'numeric', 
@@ -291,7 +298,7 @@ function Usage() {
         </div>
       )}
 
-      {alerts.map((alert, index) => (
+      {alerts && alerts.length > 0 && alerts.map((alert, index) => (
         <AlertCard key={index} type={alert.type}>
           <AlertTitle>{alert.title}</AlertTitle>
           <AlertText>{alert.text}</AlertText>
@@ -300,25 +307,25 @@ function Usage() {
 
       <StatsGrid>
         <StatCard>
-          <StatValue>{usage.current_period.documents_sent}</StatValue>
+          <StatValue>{usage.current_period?.documents_sent || 0}</StatValue>
           <StatLabel>Documentos Enviados</StatLabel>
-          <StatSubtext>de {usage.limits.documents_per_month} permitidos</StatSubtext>
+          <StatSubtext>de {usage.limits?.documents_per_month || 0} permitidos</StatSubtext>
         </StatCard>
         
         <StatCard>
-          <StatValue>{usage.current_period.documents_signed}</StatValue>
+          <StatValue>{usage.current_period?.documents_signed || 0}</StatValue>
           <StatLabel>Documentos Assinados</StatLabel>
           <StatSubtext>neste período</StatSubtext>
         </StatCard>
         
         <StatCard>
-          <StatValue>{formatBytes(usage.current_period.storage_used_mb * 1024 * 1024)}</StatValue>
+          <StatValue>{formatBytes((usage.current_period?.storage_used_mb || 0) * 1024 * 1024)}</StatValue>
           <StatLabel>Armazenamento Usado</StatLabel>
-          <StatSubtext>de {formatBytes(usage.limits.storage_limit_mb * 1024 * 1024)} disponível</StatSubtext>
+          <StatSubtext>de {formatBytes((usage.limits?.storage_limit_mb || 0) * 1024 * 1024)} disponível</StatSubtext>
         </StatCard>
         
         <StatCard>
-          <StatValue>{usage.days_remaining}</StatValue>
+          <StatValue>{usage.days_remaining || 0}</StatValue>
           <StatLabel>Dias Restantes</StatLabel>
           <StatSubtext>no período atual</StatSubtext>
         </StatCard>
@@ -332,12 +339,12 @@ function Usage() {
             <UsageLabel>Documentos Enviados</UsageLabel>
             <ProgressBar>
               <ProgressFill 
-                percentage={calculatePercentage(usage.current_period.documents_sent, usage.limits.documents_per_month)} 
+                percentage={calculatePercentage(usage.current_period?.documents_sent || 0, usage.limits?.documents_per_month || 1)} 
               />
             </ProgressBar>
           </div>
           <UsageValue>
-            {usage.current_period.documents_sent} / {usage.limits.documents_per_month}
+            {usage.current_period?.documents_sent || 0} / {usage.limits?.documents_per_month || 0}
           </UsageValue>
         </UsageItem>
         
@@ -346,12 +353,12 @@ function Usage() {
             <UsageLabel>Armazenamento</UsageLabel>
             <ProgressBar>
               <ProgressFill 
-                percentage={calculatePercentage(usage.current_period.storage_used_mb, usage.limits.storage_limit_mb)} 
+                percentage={calculatePercentage(usage.current_period?.storage_used_mb || 0, usage.limits?.storage_limit_mb || 1)} 
               />
             </ProgressBar>
           </div>
           <UsageValue>
-            {formatBytes(usage.current_period.storage_used_mb * 1024 * 1024)} / {formatBytes(usage.limits.storage_limit_mb * 1024 * 1024)}
+            {formatBytes((usage.current_period?.storage_used_mb || 0) * 1024 * 1024)} / {formatBytes((usage.limits?.storage_limit_mb || 0) * 1024 * 1024)}
           </UsageValue>
         </UsageItem>
         
@@ -360,12 +367,12 @@ function Usage() {
             <UsageLabel>Chamadas da API</UsageLabel>
             <ProgressBar>
               <ProgressFill 
-                percentage={calculatePercentage(usage.current_period.api_calls, usage.limits.api_calls_per_month)} 
+                percentage={calculatePercentage(usage.current_period?.api_calls || 0, usage.limits?.api_calls_per_month || 1)} 
               />
             </ProgressBar>
           </div>
           <UsageValue>
-            {usage.current_period.api_calls} / {usage.limits.api_calls_per_month}
+            {usage.current_period?.api_calls || 0} / {usage.limits?.api_calls_per_month || 0}
           </UsageValue>
         </UsageItem>
         
@@ -374,12 +381,12 @@ function Usage() {
             <UsageLabel>Mensagens WhatsApp</UsageLabel>
             <ProgressBar>
               <ProgressFill 
-                percentage={calculatePercentage(usage.current_period.whatsapp_messages, usage.limits.whatsapp_messages_per_month)} 
+                percentage={calculatePercentage(usage.current_period?.whatsapp_messages || 0, usage.limits?.whatsapp_messages_per_month || 1)} 
               />
             </ProgressBar>
           </div>
           <UsageValue>
-            {usage.current_period.whatsapp_messages} / {usage.limits.whatsapp_messages_per_month}
+            {usage.current_period?.whatsapp_messages || 0} / {usage.limits?.whatsapp_messages_per_month || 0}
           </UsageValue>
         </UsageItem>
       </ChartCard>

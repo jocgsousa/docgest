@@ -194,6 +194,16 @@ function App() {
                 } 
               />
               <Route 
+                path="/documentos/novo" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Documents openCreateModal={true} />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/usuarios" 
                 element={
                   <ProtectedRoute>
@@ -297,6 +307,13 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
+            <Route path="/filiais/nova" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Branches openCreateModal={true} />
+                </Layout>
+              </ProtectedRoute>
+            } />
             <Route path="/whatsapp" element={
               <ProtectedRoute>
                 <Layout>
@@ -311,7 +328,7 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/uso-mensal" element={
+            <Route path="/uso" element={
               <ProtectedRoute>
                 <Layout>
                   <Usage />

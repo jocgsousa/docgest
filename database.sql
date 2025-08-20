@@ -28,6 +28,7 @@ CREATE TABLE empresas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(150) NOT NULL,
     cnpj VARCHAR(18) UNIQUE NOT NULL,
+    codigo_empresa VARCHAR(10) UNIQUE NOT NULL,
     email VARCHAR(150) NOT NULL,
     telefone VARCHAR(20),
     endereco TEXT,
@@ -208,8 +209,8 @@ INSERT INTO profissoes (nome, descricao) VALUES
 ('Outros', 'Outras profissões não listadas');
 
 -- Empresa exemplo
-INSERT INTO empresas (nome, cnpj, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
-('Empresa Exemplo LTDA', '95264309000103', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
+INSERT INTO empresas (nome, cnpj, codigo_empresa, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
+('Empresa Exemplo LTDA', '95264309000103', 'EMP001', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
 
 -- Filial exemplo
 INSERT INTO filiais (empresa_id, nome, cnpj, inscricao_estadual, endereco, cidade, estado, cep, telefone, email, responsavel, observacoes) VALUES
