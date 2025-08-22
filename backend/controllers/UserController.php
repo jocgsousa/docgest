@@ -589,12 +589,12 @@ class UserController {
     }
     
     /**
-     * Cria uma solicitação de exclusão de usuário (LGPD)
+     * Cria uma solicitação de usuário
      */
-    public function requestDeletion() {
+    public function createRequest() {
         try {
             // Apenas admin de empresa pode solicitar exclusão
-            $currentUser = JWT::requireCompanyAdmin();
+            $currentUser = JWT::requireAdminOrCompanyAdmin();
             
             $data = json_decode(file_get_contents('php://input'), true);
             
@@ -602,7 +602,7 @@ class UserController {
             $validator = new Validator($data);
             $validator->required(['usuario_id', 'motivo'])
                      ->integer('usuario_id')
-                     ->in('motivo', ['inatividade', 'mudanca_empresa', 'solicitacao_titular', 'violacao_politica', 'outros']);
+                     ->in('motivo', ['inatividade', 'mudanca_empresa', 'solicitacao_titular', 'violacao_politica', 'lgpd', 'outros']);
             
             if (!$validator->isValid()) {
                 Response::error('Dados inválidos', 400, $validator->getErrors());
@@ -620,7 +620,7 @@ class UserController {
             }
             
             // Verificar se já existe uma solicitação pendente para este usuário
-            $existingRequest = $this->checkExistingDeletionRequest($data['usuario_id']);
+            $existingRequest = $this->checkExistingRequest($data['usuario_id']);
             
             if ($existingRequest) {
                 Response::error('Já existe uma solicitação de exclusão pendente para este usuário', 400);
@@ -631,11 +631,11 @@ class UserController {
                 'usuario_solicitante_id' => $currentUser['user_id'],
                 'usuario_alvo_id' => $data['usuario_id'],
                 'motivo' => $data['motivo'],
-                'motivo_detalhado' => $data['motivo_detalhado'] ?? null,
+                'detalhes' => $data['detalhes'] ?? null,
                 'empresa_id' => $currentUser['empresa_id']
             ];
             
-            $requestId = $this->createDeletionRequest($requestData);
+            $requestId = $this->createRequestRecord($requestData);
             
             if (!$requestId) {
                 Response::error('Erro ao criar solicitação de exclusão', 500);
@@ -655,13 +655,14 @@ class UserController {
     }
     
     /**
-     * Verifica se já existe uma solicitação de exclusão pendente
+     * Verifica se já existe uma solicitação pendente
      */
-    private function checkExistingDeletionRequest($userId) {
-        $pdo = Database::getConnection();
+    private function checkExistingRequest($userId) {
+        $database = new Database();
+        $pdo = $database->getConnection();
         
         $stmt = $pdo->prepare("
-            SELECT id FROM solicitacoes_exclusao 
+            SELECT id FROM solicitacoes 
             WHERE usuario_alvo_id = ? AND status = 'pendente' AND ativo = 1
         ");
         
@@ -670,22 +671,24 @@ class UserController {
     }
     
     /**
-     * Cria uma solicitação de exclusão no banco de dados
+     * Cria uma solicitação no banco de dados
      */
-    private function createDeletionRequest($data) {
-        $pdo = Database::getConnection();
+    private function createRequestRecord($data) {
+        $database = new Database();
+        $pdo = $database->getConnection();
         
         $stmt = $pdo->prepare("
-            INSERT INTO solicitacoes_exclusao 
-            (usuario_solicitante_id, usuario_alvo_id, motivo, motivo_detalhado, empresa_id) 
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO solicitacoes 
+            (usuario_solicitante_id, usuario_alvo_id, tipo_solicitacao, motivo, detalhes, empresa_id) 
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
         
         $success = $stmt->execute([
             $data['usuario_solicitante_id'],
             $data['usuario_alvo_id'],
+            $data['tipo_solicitacao'] ?? 'exclusao',
             $data['motivo'],
-            $data['motivo_detalhado'],
+            $data['detalhes'],
             $data['empresa_id']
         ]);
         
@@ -758,9 +761,9 @@ class UserController {
     }
 
     /**
-     * Lista solicitações de exclusão
+     * Lista solicitações
      */
-    public function listDeletionRequests() {
+    public function listRequests() {
         try {
             $currentUser = JWT::requireAdminOrCompanyAdmin();
             
@@ -791,7 +794,8 @@ class UserController {
             
             $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
             
-            $pdo = Database::getConnection();
+            $database = new Database();
+            $pdo = $database->getConnection();
             
             // Query principal
             $sql = "
@@ -801,22 +805,22 @@ class UserController {
                     s.usuario_solicitante_id,
                     s.empresa_id,
                     s.motivo,
-                    s.motivo_detalhado,
+                    s.detalhes,
                     s.status,
-                    s.data_solicitacao,
+                    s.data_criacao as data_solicitacao,
                     s.data_processamento,
-                    s.observacoes_admin,
+                    s.justificativa_resposta,
                     ua.nome as usuario_alvo_nome,
                     ua.email as usuario_alvo_email,
                     us.nome as usuario_solicitante_nome,
                     us.email as usuario_solicitante_email,
                     e.nome as empresa_nome
-                FROM solicitacoes_exclusao s
+                FROM solicitacoes s
                 LEFT JOIN usuarios ua ON s.usuario_alvo_id = ua.id
                 LEFT JOIN usuarios us ON s.usuario_solicitante_id = us.id
                 LEFT JOIN empresas e ON s.empresa_id = e.id
                 {$whereClause}
-                ORDER BY s.data_solicitacao DESC
+                ORDER BY s.data_criacao DESC
                 LIMIT :limit OFFSET :offset
             ";
             
@@ -836,7 +840,7 @@ class UserController {
             // Contar total de registros
             $countSql = "
                 SELECT COUNT(*) as total
-                FROM solicitacoes_exclusao s
+                FROM solicitacoes s
                 LEFT JOIN usuarios ua ON s.usuario_alvo_id = ua.id
                 LEFT JOIN usuarios us ON s.usuario_solicitante_id = us.id
                 LEFT JOIN empresas e ON s.empresa_id = e.id
@@ -869,9 +873,9 @@ class UserController {
     }
 
     /**
-     * Atualiza uma solicitação de exclusão (apenas super admins)
+     * Atualiza uma solicitação (apenas super admins)
      */
-    public function updateDeletionRequest() {
+    public function updateRequest() {
         try {
             $currentUser = JWT::requireSuperAdmin();
             
@@ -898,10 +902,11 @@ class UserController {
                 return;
             }
             
-            $pdo = Database::getConnection();
+            $database = new Database();
+            $pdo = $database->getConnection();
             
             // Verificar se a solicitação existe
-            $checkStmt = $pdo->prepare("SELECT * FROM solicitacoes_exclusao WHERE id = ?");
+            $checkStmt = $pdo->prepare("SELECT * FROM solicitacoes WHERE id = ?");
             $checkStmt->execute([$input['id']]);
             $request = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -916,8 +921,8 @@ class UserController {
                 'data_processamento' => date('Y-m-d H:i:s')
             ];
             
-            if (isset($input['observacoes_admin'])) {
-                $updateData['observacoes_admin'] = $input['observacoes_admin'];
+            if (isset($input['justificativa_resposta'])) {
+                $updateData['justificativa_resposta'] = $input['justificativa_resposta'];
             }
             
             // Construir query de atualização
@@ -926,7 +931,7 @@ class UserController {
                 $setClause[] = "$field = :$field";
             }
             
-            $sql = "UPDATE solicitacoes_exclusao SET " . implode(', ', $setClause) . " WHERE id = :id";
+            $sql = "UPDATE solicitacoes SET " . implode(', ', $setClause) . " WHERE id = :id";
             
             $stmt = $pdo->prepare($sql);
             
@@ -960,13 +965,189 @@ class UserController {
      */
     private function deactivateUserFromRequest($userId) {
         try {
-            $pdo = Database::getConnection();
+            $database = new Database();
+            $pdo = $database->getConnection();
             
             $stmt = $pdo->prepare("UPDATE usuarios SET ativo = 0 WHERE id = ?");
             $stmt->execute([$userId]);
             
         } catch (Exception $e) {
             error_log("Erro ao desativar usuário: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Gera um link de cadastro com token de autorização
+     */
+    public function generateRegistrationLink() {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            // Validar entrada
+            if (!isset($input['empresa_id']) || !isset($input['tipo_usuario'])) {
+                Response::error('Empresa ID e tipo de usuário são obrigatórios', 400);
+                return;
+            }
+            
+            $empresaId = $input['empresa_id'];
+            $tipoUsuario = $input['tipo_usuario'] ?? 'assinante';
+            $emailDestinatario = $input['email_destinatario'] ?? null;
+            
+            // Verificar se o usuário tem permissão para gerar links para esta empresa
+            $authUser = JWT::requireAuth();
+            
+            // Verificar permissões
+            if ($authUser['tipo_usuario'] != 1 && $authUser['empresa_id'] != $empresaId) {
+                Response::error('Sem permissão para gerar links para esta empresa', 403);
+                return;
+            }
+            
+            $database = new Database();
+            $pdo = $database->getConnection();
+            
+            // Gerar token único
+            $tokenHash = bin2hex(random_bytes(32));
+            
+            // Definir data de expiração (30 minutos)
+            $dataExpiracao = date('Y-m-d H:i:s', strtotime('+30 minutes'));
+            
+            // Inserir token na base de dados
+            $stmt = $pdo->prepare("
+                INSERT INTO tokens_cadastro 
+                (token_hash, empresa_id, tipo_usuario, email_destinatario, criado_por, data_expiracao) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $tokenHash,
+                $empresaId,
+                $tipoUsuario,
+                $emailDestinatario,
+                $authUser['user_id'],
+                $dataExpiracao
+            ]);
+            
+            // Buscar código da empresa
+            $stmtEmpresa = $pdo->prepare("SELECT codigo_empresa FROM empresas WHERE id = ?");
+            $stmtEmpresa->execute([$empresaId]);
+            $empresa = $stmtEmpresa->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$empresa) {
+                Response::error('Empresa não encontrada', 404);
+                return;
+            }
+            
+            $codigoEmpresa = $empresa['codigo_empresa'];
+            
+            // Gerar URL do link
+            $baseUrl = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+            $registrationUrl = "{$protocol}://{$baseUrl}/cadastro?token={$tokenHash}&tipo={$tipoUsuario}&empresa={$codigoEmpresa}";
+            
+            Response::success([
+                'message' => 'Link de cadastro gerado com sucesso',
+                'token' => $tokenHash,
+                'url' => $registrationUrl,
+                'expira_em' => $dataExpiracao,
+                'tipo_usuario' => $tipoUsuario,
+                'empresa_id' => $empresaId
+            ]);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao gerar link de cadastro: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Valida um token de cadastro
+     */
+    public function validateRegistrationToken() {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($input['token'])) {
+                Response::error('Token é obrigatório', 400);
+                return;
+            }
+            
+            $token = $input['token'];
+            
+            $database = new Database();
+            $pdo = $database->getConnection();
+            
+            // Buscar token na base de dados
+            $stmt = $pdo->prepare("
+                SELECT tc.*, e.nome as empresa_nome, e.codigo_empresa as empresa_codigo
+                FROM tokens_cadastro tc
+                JOIN empresas e ON tc.empresa_id = e.id
+                WHERE tc.token_hash = ? AND tc.ativo = 1 AND tc.usado = 0
+            ");
+            
+            $stmt->execute([$token]);
+            $tokenData = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$tokenData) {
+                Response::error('Token inválido ou já utilizado', 400);
+                return;
+            }
+            
+            // Verificar se o token expirou
+            $now = new DateTime();
+            $expiration = new DateTime($tokenData['data_expiracao']);
+            
+            if ($now > $expiration) {
+                Response::error('Token expirado', 400);
+                return;
+            }
+            
+            Response::success([
+                'message' => 'Token válido',
+                'token_data' => [
+                    'empresa_id' => $tokenData['empresa_id'],
+                    'empresa_nome' => $tokenData['empresa_nome'],
+                    'empresa_codigo' => $tokenData['empresa_codigo'],
+                    'tipo_usuario' => $tokenData['tipo_usuario'],
+                    'email_destinatario' => $tokenData['email_destinatario'],
+                    'expira_em' => $tokenData['data_expiracao']
+                ]
+            ]);
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao validar token: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Marca um token como usado após o cadastro ser concluído
+     */
+    public function markTokenAsUsed() {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($input['token']) || !isset($input['usuario_criado_id'])) {
+                Response::error('Token e ID do usuário são obrigatórios', 400);
+                return;
+            }
+            
+            $tokenHash = $input['token'];
+            $usuarioId = $input['usuario_criado_id'];
+            
+            $database = new Database();
+            $pdo = $database->getConnection();
+            
+            $stmt = $pdo->prepare("
+                UPDATE tokens_cadastro 
+                SET usado = 1, data_uso = NOW(), usuario_criado_id = ?
+                WHERE token_hash = ?
+            ");
+            
+            $stmt->execute([$usuarioId, $tokenHash]);
+            
+            Response::success(null, 'Token marcado como usado com sucesso');
+            
+        } catch (Exception $e) {
+            error_log("Erro ao marcar token como usado: " . $e->getMessage());
+            Response::error('Erro interno do servidor', 500);
         }
     }
 }

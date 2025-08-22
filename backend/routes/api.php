@@ -128,8 +128,8 @@ try {
                         $controller->stats();
                     } elseif ($id === 'by-company-branch') {
                         $controller->getByCompanyAndBranch();
-                    } elseif ($id === 'deletion-requests') {
-                        $controller->listDeletionRequests();
+                    } elseif ($id === 'requests') {
+                        $controller->listRequests();
                     } elseif ($action === null) {
                         $controller->show($id);
                     } elseif ($action === 'empresa') {
@@ -144,10 +144,16 @@ try {
                 case 'POST':
                     if ($id === null) {
                         $controller->store();
-                    } elseif ($id === 'request-deletion') {
-                        $controller->requestDeletion();
-                    } elseif ($id === 'update-deletion-request') {
-                        $controller->updateDeletionRequest();
+                    } elseif ($id === 'create-request') {
+                        $controller->createRequest();
+                    } elseif ($id === 'update-request') {
+                        $controller->updateRequest();
+                    } elseif ($id === 'generate-registration-link') {
+                        $controller->generateRegistrationLink();
+                    } elseif ($id === 'validate-registration-token') {
+                        $controller->validateRegistrationToken();
+                    } elseif ($id === 'mark-token-used') {
+                        $controller->markTokenAsUsed();
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }

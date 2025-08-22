@@ -9,6 +9,7 @@ import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import RegistrationLinkGenerator from '../components/RegistrationLinkGenerator';
 import { formatErrors } from '../utils/fieldLabels';
 
 const PageContainer = styled.div`
@@ -132,6 +133,7 @@ const Users = ({ openCreateModal = false }) => {
     motivo: '',
     detalhes: ''
   });
+  const [showLinkGenerator, setShowLinkGenerator] = useState(false);
 
   const userTypes = {
     1: 'Super Admin',
@@ -145,12 +147,12 @@ const Users = ({ openCreateModal = false }) => {
   };
 
   const deletionReasons = {
-    'dados_incorretos': 'Dados incorretos ou desatualizados',
-    'nao_utiliza_mais': 'Não utiliza mais o sistema',
-    'duplicacao': 'Conta duplicada',
-    'violacao_termos': 'Violação dos termos de uso',
-    'solicitacao_usuario': 'Solicitação do próprio usuário (LGPD)',
-    'outro': 'Outro motivo'
+    'inatividade': 'Inatividade do usuário',
+    'mudanca_empresa': 'Mudança de empresa',
+    'solicitacao_titular': 'Solicitação do titular dos dados',
+    'violacao_politica': 'Violação de política',
+    'lgpd': 'LGPD',
+    'outros': 'Outros motivos'
   };
 
   const columns = [
@@ -239,7 +241,7 @@ const Users = ({ openCreateModal = false }) => {
               $variant="warning"
               onClick={() => handleRequestDeletion(row)}
             >
-              Solicitar Exclusão
+              Criar Solicitação
             </Button>
           )}
         </div>
@@ -390,7 +392,7 @@ const Users = ({ openCreateModal = false }) => {
 
     try {
       setSubmitting(true);
-      await api.post('/users/request-deletion', {
+      await api.post('/users/create-request', {
         usuario_id: deletionUser.id,
         motivo: deletionData.motivo,
         detalhes: deletionData.detalhes
@@ -478,9 +480,17 @@ const Users = ({ openCreateModal = false }) => {
       <PageHeader>
         <PageTitle>Usuários</PageTitle>
         {canCreateUser && (
-          <Button onClick={() => setShowModal(true)}>
-            Novo Usuário
-          </Button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Button onClick={() => setShowModal(true)}>
+              Novo Usuário
+            </Button>
+            <Button 
+              $variant="outline" 
+              onClick={() => setShowLinkGenerator(true)}
+            >
+              Gerar Link de Cadastro
+            </Button>
+          </div>
         )}
       </PageHeader>
 
@@ -764,12 +774,12 @@ const Users = ({ openCreateModal = false }) => {
           setDeletionUser(null);
           setDeletionData({ motivo: '', detalhes: '' });
         }}
-        title="Solicitar Exclusão de Usuário"
+        title="Criar Solicitação para Usuário"
       >
         <form onSubmit={handleSubmitDeletion}>
           <div style={{ marginBottom: '16px' }}>
             <p style={{ marginBottom: '16px', color: '#6b7280' }}>
-              Você está solicitando a exclusão do usuário: <strong>{deletionUser?.nome}</strong>
+              Você está criando uma solicitação para o usuário: <strong>{deletionUser?.nome}</strong>
             </p>
             
             <div style={{ marginBottom: '16px' }}>
@@ -795,7 +805,7 @@ const Users = ({ openCreateModal = false }) => {
               </select>
             </div>
 
-            {deletionData.motivo === 'outro' && (
+            {deletionData.motivo === 'outros' && (
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
                   Especifique o motivo *
@@ -803,7 +813,7 @@ const Users = ({ openCreateModal = false }) => {
                 <textarea
                   value={deletionData.detalhes}
                   onChange={(e) => setDeletionData(prev => ({ ...prev, detalhes: e.target.value }))}
-                  placeholder="Descreva o motivo da solicitação de exclusão..."
+                  placeholder="Descreva o motivo da solicitação..."
                   rows={4}
                   style={{
                     width: '100%',
@@ -849,7 +859,6 @@ const Users = ({ openCreateModal = false }) => {
             }}>
               <p style={{ margin: 0, fontSize: '14px', color: '#92400e' }}>
                 <strong>Atenção:</strong> Esta solicitação será enviada aos administradores do sistema para análise. 
-                O usuário não será excluído automaticamente.
               </p>
             </div>
           </div>
@@ -872,6 +881,13 @@ const Users = ({ openCreateModal = false }) => {
           </div>
         </form>
       </Modal>
+
+      <RegistrationLinkGenerator
+        isOpen={showLinkGenerator}
+        onClose={() => setShowLinkGenerator(false)}
+        companies={companies}
+        userCompanyId={user?.empresa_id}
+      />
     </PageContainer>
   );
 };

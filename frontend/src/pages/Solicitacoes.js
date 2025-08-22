@@ -8,6 +8,7 @@ import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import { formatDate } from '../utils/dateUtils';
 import {
   Search,
   Filter,
@@ -110,7 +111,7 @@ const Solicitacoes = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
     status: '',
-    observacoes_admin: ''
+    justificativa_resposta: ''
   });
   const [viewingRequest, setViewingRequest] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -121,6 +122,7 @@ const Solicitacoes = () => {
     { value: 'mudanca_empresa', label: 'Mudança de empresa' },
     { value: 'solicitacao_titular', label: 'Solicitação do titular dos dados' },
     { value: 'violacao_politica', label: 'Violação de política' },
+    { value: 'lgpd', label: 'LGPD' },
     { value: 'outros', label: 'Outros motivos' }
   ];
 
@@ -167,16 +169,21 @@ const Solicitacoes = () => {
         }
       });
 
-      const response = await api.get(`/users/deletion-requests?${params}`);
+      console.log('Fazendo requisição para:', `/users/requests?${params}`);
+      const response = await api.get(`/users/requests?${params}`);
+      console.log('Resposta da API:', response.data);
       
       if (response.data.success) {
+        console.log('Solicitações recebidas:', response.data.data.requests);
         setRequests(response.data.data.requests);
         setPagination(response.data.data.pagination);
       } else {
+        console.error('Erro na resposta da API:', response.data.message);
         toast.error('Erro ao carregar solicitações');
       }
     } catch (error) {
       console.error('Erro ao carregar solicitações:', error);
+      console.error('Detalhes do erro:', error.response?.data);
       toast.error('Erro ao carregar solicitações');
     } finally {
       setLoading(false);
@@ -201,7 +208,7 @@ const Solicitacoes = () => {
     setEditingRequest(request);
     setEditForm({
       status: request.status,
-      observacoes_admin: request.observacoes_admin || ''
+      justificativa_resposta: request.justificativa_resposta || ''
     });
     setShowEditModal(true);
   };
@@ -209,7 +216,7 @@ const Solicitacoes = () => {
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditingRequest(null);
-    setEditForm({ status: '', observacoes_admin: '' });
+    setEditForm({ status: '', justificativa_resposta: '' });
   };
 
   const openViewModal = (request) => {
@@ -224,7 +231,7 @@ const Solicitacoes = () => {
 
   const handleUpdateRequest = async () => {
     try {
-      const response = await api.post('/users/update-deletion-request', {
+      const response = await api.post('/users/update-request', {
         id: editingRequest.id,
         ...editForm
       });
@@ -242,9 +249,7 @@ const Solicitacoes = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('pt-BR');
-  };
+  // Função formatDate agora é importada de dateUtils
 
   const getMotiveLabel = (motivo) => {
     const option = motivoOptions.find(opt => opt.value === motivo);
@@ -252,6 +257,8 @@ const Solicitacoes = () => {
   };
 
   useEffect(() => {
+    console.log('Usuário atual:', user);
+    console.log('Token no localStorage:', localStorage.getItem('token'));
     fetchRequests();
   }, []);
 
@@ -298,7 +305,7 @@ const Solicitacoes = () => {
       )
     },
     {
-      key: 'data_criacao',
+      key: 'data_solicitacao',
       label: 'Data da Solicitação',
       render: (value) => formatDate(value)
     },
@@ -344,11 +351,11 @@ const Solicitacoes = () => {
     <PageContainer>
       <PageHeader>
         <div>
-          <PageTitle>Solicitações de Exclusão</PageTitle>
+          <PageTitle>Solicitações</PageTitle>
           <PageSubtitle>
             {canEdit 
-              ? 'Gerencie todas as solicitações de exclusão de usuários do sistema'
-              : 'Visualize as solicitações de exclusão da sua empresa'
+              ? 'Gerencie todas as solicitações de usuários do sistema'
+              : 'Visualize as solicitações da sua empresa'
             }
           </PageSubtitle>
         </div>
@@ -479,13 +486,13 @@ const Solicitacoes = () => {
                 </div>
               )}
               
-              {viewingRequest.observacoes_admin && (
+              {viewingRequest.justificativa_resposta && (
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
-                    Observações do Administrador
+                    Justificativa da Resposta
                   </label>
                   <p style={{ fontSize: '14px', backgroundColor: '#f9fafb', padding: '12px', borderRadius: '6px', margin: '0' }}>
-                    {viewingRequest.observacoes_admin}
+                    {viewingRequest.justificativa_resposta}
                   </p>
                 </div>
               )}
@@ -526,11 +533,11 @@ const Solicitacoes = () => {
  
             <div>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
-                Observações do Administrador
+                Justificativa da Resposta
               </label>
               <textarea
-                value={editForm.observacoes_admin}
-                onChange={(e) => setEditForm(prev => ({ ...prev, observacoes_admin: e.target.value }))}
+                value={editForm.justificativa_resposta}
+                onChange={(e) => setEditForm(prev => ({ ...prev, justificativa_resposta: e.target.value }))}
                 rows={4}
                 style={{
                   width: '100%',

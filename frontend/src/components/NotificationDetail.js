@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { X, Calendar, User, Building } from 'lucide-react';
+import { formatDate } from '../utils/dateUtils';
 
 const Overlay = styled.div`
   position: fixed;
@@ -165,16 +166,7 @@ function NotificationDetail({ notification, onClose, onMarkAsRead }) {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Data não disponível';
-    return new Date(dateString).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Função formatDate agora é importada de dateUtils
 
   return (
     <Overlay onClick={handleOverlayClick}>

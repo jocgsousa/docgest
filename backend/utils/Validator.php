@@ -11,9 +11,18 @@ class Validator {
     /**
      * Valida se o campo é obrigatório
      */
-    public function required($field, $message = null) {
-        if (!isset($this->data[$field]) || empty(trim($this->data[$field]))) {
-            $this->errors[$field] = $message ?: "O campo {$field} é obrigatório";
+    public function required($fields, $message = null) {
+        if (is_array($fields)) {
+            foreach ($fields as $field) {
+                if (!isset($this->data[$field]) || (is_string($this->data[$field]) && empty(trim($this->data[$field])))) {
+                    $this->errors[$field] = $message ?: "O campo {$field} é obrigatório";
+                }
+            }
+        } else {
+            $field = $fields;
+            if (!isset($this->data[$field]) || (is_string($this->data[$field]) && empty(trim($this->data[$field])))) {
+                $this->errors[$field] = $message ?: "O campo {$field} é obrigatório";
+            }
         }
         return $this;
     }
@@ -274,6 +283,13 @@ class Validator {
      */
     public function hasErrors() {
         return !empty($this->errors);
+    }
+    
+    /**
+     * Verifica se a validação é válida (sem erros)
+     */
+    public function isValid() {
+        return !$this->hasErrors();
     }
     
     /**

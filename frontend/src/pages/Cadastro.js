@@ -218,6 +218,8 @@ function Cadastro() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [tokenData, setTokenData] = useState(null);
+  const [validatingToken, setValidatingToken] = useState(false);
   const [formData, setFormData] = useState({
     // Campos comuns
     nome: '',
@@ -240,23 +242,52 @@ function Cadastro() {
   });
 
   useEffect(() => {
-    const tipo = searchParams.get('tipo');
     const teste = searchParams.get('teste');
+    const token = searchParams.get('token');
     
-    if (tipo === 'empresa' || tipo === 'assinante') {
-      setAccountType(tipo);
-    }
+    // Tipo padrão é sempre 'empresa', exceto quando token de assinante é validado
+    setAccountType('empresa');
     
     if (teste === 'true') {
       setIsTest(true);
     }
+    
+    // Validar token de autorização se presente
+    if (token) {
+      validateRegistrationToken(token);
+    }
   }, [searchParams]);
-
-  const handleTypeChange = (type) => {
-    setAccountType(type);
+  
+  const validateRegistrationToken = async (token) => {
+    setValidatingToken(true);
     setError('');
-    setSuccess('');
+    
+    try {
+      const response = await api.post('/users/validate-registration-token', { token });
+      
+      if (response.data.success) {
+        const tokenData = response.data.data.token_data;
+        setTokenData(tokenData);
+        
+        // Preencher automaticamente os dados
+        setAccountType('assinante'); // Forçar tipo assinante
+        setFormData(prev => ({
+          ...prev,
+          codigoEmpresa: tokenData.empresa_codigo || '',
+          email: tokenData.email_destinatario || prev.email
+        }));
+      } else {
+        setError('Link de cadastro inválido ou expirado.');
+      }
+    } catch (error) {
+      console.error('Erro ao validar token:', error);
+      setError('Link de cadastro inválido ou expirado.');
+    } finally {
+      setValidatingToken(false);
+    }
   };
+
+  // Função handleTypeChange removida - tipo é definido automaticamente
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -326,6 +357,12 @@ function Cadastro() {
         teste: isTest
       };
 
+      // Incluir token se presente
+      const token = searchParams.get('token');
+      if (token) {
+        payload.token = token;
+      }
+
       if (accountType === 'empresa') {
         payload.nomeEmpresa = formData.nomeEmpresa;
         payload.cnpj = formData.cnpj;
@@ -340,7 +377,20 @@ function Cadastro() {
 
       // Usar endpoint específico baseado no tipo de conta
       const endpoint = accountType === 'assinante' ? '/auth/register-external' : '/auth/register';
-      await api.post(endpoint, payload);
+      const response = await api.post(endpoint, payload);
+      
+      // Marcar token como usado se presente
+      if (token && response.data.success) {
+        try {
+          await api.post('/users/mark-token-used', { 
+            token, 
+            usuario_criado_id: response.data.data?.id 
+          });
+        } catch (tokenError) {
+          console.error('Erro ao marcar token como usado:', tokenError);
+          // Não interromper o fluxo se falhar ao marcar o token
+        }
+      }
       
       setSuccess('Cadastro realizado com sucesso! Você será redirecionado para o login.');
       
@@ -376,35 +426,61 @@ function Cadastro() {
           </TestBadge>
         )}
 
-        <TypeSelector>
-          <TypeOption 
-            type="button"
-            $selected={accountType === 'empresa'}
-            onClick={() => handleTypeChange('empresa')}
-          >
-            <TypeIcon $selected={accountType === 'empresa'}>
-              <Building2 size={24} />
-            </TypeIcon>
-            <TypeTitle $selected={accountType === 'empresa'}>Empresa</TypeTitle>
-            <TypeDescription>
-              Para empresas que desejam usar a plataforma para gestão de documentos
-            </TypeDescription>
-          </TypeOption>
-          
-          <TypeOption 
-            type="button"
-            $selected={accountType === 'assinante'}
-            onClick={() => handleTypeChange('assinante')}
-          >
-            <TypeIcon $selected={accountType === 'assinante'}>
-              <User size={24} />
-            </TypeIcon>
-            <TypeTitle $selected={accountType === 'assinante'}>Assinante</TypeTitle>
-            <TypeDescription>
-              Para pessoas que irão receber e assinar documentos
-            </TypeDescription>
-          </TypeOption>
-        </TypeSelector>
+        {validatingToken && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p>Validando link de cadastro...</p>
+          </div>
+        )}
+        
+        {tokenData && (
+          <div style={{ 
+            backgroundColor: '#dcfce7', 
+            color: '#166534', 
+            padding: '12px', 
+            borderRadius: '6px', 
+            marginBottom: '16px',
+            textAlign: 'center'
+          }}>
+            ✅ Link válido! Cadastro para empresa: <strong>{tokenData.empresa_nome}</strong>
+          </div>
+        )}
+        
+        {/* Seletor de tipo removido - padrão é 'empresa', exceto quando token de assinante é validado */}
+        {tokenData && (
+          <div style={{ 
+            backgroundColor: '#f3f4f6', 
+            color: '#374151', 
+            padding: '12px', 
+            borderRadius: '6px', 
+            marginBottom: '16px',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <User size={20} />
+            <span>Cadastro de <strong>Assinante</strong> para empresa: <strong>{tokenData.empresa_nome}</strong></span>
+          </div>
+        )}
+        
+        {!tokenData && (
+          <div style={{ 
+            backgroundColor: '#f3f4f6', 
+            color: '#374151', 
+            padding: '12px', 
+            borderRadius: '6px', 
+            marginBottom: '16px',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <Building2 size={20} />
+            <span>Cadastro de <strong>Empresa</strong></span>
+          </div>
+        )}
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
         {success && <SuccessMessage>{success}</SuccessMessage>}

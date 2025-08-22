@@ -482,17 +482,18 @@ INSERT INTO configuracoes (chave, valor, tipo, descricao, categoria) VALUES
 ('max_signers_per_document', '10', 'number', 'Máximo de signatários por documento', 'assinatura');
 
 -- ================================================
--- SOLICITAÇÕES DE EXCLUSÃO (LGPD)
+-- SOLICITAÇÕES GERAIS
 -- ================================================
-CREATE TABLE solicitacoes_exclusao (
+CREATE TABLE solicitacoes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_solicitante_id INT NOT NULL,
     usuario_alvo_id INT NOT NULL,
-    motivo ENUM('inatividade','mudanca_empresa','solicitacao_titular','violacao_politica','outros') NOT NULL,
-    motivo_detalhado TEXT,
+    tipo_solicitacao ENUM('exclusao','portabilidade','retificacao','acesso','oposicao','outros') NOT NULL DEFAULT 'exclusao',
+    motivo ENUM('inatividade','mudanca_empresa','solicitacao_titular','violacao_politica','lgpd','outros') NOT NULL,
+    detalhes TEXT,
     status ENUM('pendente','aprovada','rejeitada','processada') DEFAULT 'pendente',
     justificativa_resposta TEXT,
-    processada_por INT,
+    processado_por INT,
     data_processamento DATETIME,
     empresa_id INT NOT NULL,
     ativo BOOLEAN DEFAULT TRUE,
@@ -500,15 +501,45 @@ CREATE TABLE solicitacoes_exclusao (
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_solicitante_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     FOREIGN KEY (usuario_alvo_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-    FOREIGN KEY (processada_por) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (processado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
     FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
 );
 
--- Índices para performance das solicitações de exclusão
-CREATE INDEX idx_solicitacoes_exclusao_solicitante ON solicitacoes_exclusao(usuario_solicitante_id);
-CREATE INDEX idx_solicitacoes_exclusao_alvo ON solicitacoes_exclusao(usuario_alvo_id);
-CREATE INDEX idx_solicitacoes_exclusao_status ON solicitacoes_exclusao(status);
-CREATE INDEX idx_solicitacoes_exclusao_empresa ON solicitacoes_exclusao(empresa_id);
+-- Índices para performance das solicitações
+CREATE INDEX idx_solicitacoes_solicitante ON solicitacoes(usuario_solicitante_id);
+CREATE INDEX idx_solicitacoes_alvo ON solicitacoes(usuario_alvo_id);
+CREATE INDEX idx_solicitacoes_status ON solicitacoes(status);
+CREATE INDEX idx_solicitacoes_empresa ON solicitacoes(empresa_id);
+CREATE INDEX idx_solicitacoes_tipo ON solicitacoes(tipo_solicitacao);
+CREATE INDEX idx_solicitacoes_motivo ON solicitacoes(motivo);
+
+-- ================================================
+-- TABELA DE TOKENS DE CADASTRO
+-- ================================================
+-- Tabela para armazenar tokens de autorização para cadastro de usuários
+CREATE TABLE tokens_cadastro (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    empresa_id INT NOT NULL,
+    tipo_usuario ENUM('assinante','admin_empresa','super_admin') NOT NULL DEFAULT 'assinante',
+    email_destinatario VARCHAR(255),
+    criado_por INT NOT NULL,
+    usado BOOLEAN DEFAULT FALSE,
+    data_uso DATETIME NULL,
+    usuario_criado_id INT NULL,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_expiracao DATETIME NOT NULL,
+    ativo BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
+    FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_criado_id) REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+-- Índices para performance dos tokens de cadastro
+CREATE INDEX idx_tokens_cadastro_hash ON tokens_cadastro(token_hash);
+CREATE INDEX idx_tokens_cadastro_empresa ON tokens_cadastro(empresa_id);
+CREATE INDEX idx_tokens_cadastro_expiracao ON tokens_cadastro(data_expiracao);
+CREATE INDEX idx_tokens_cadastro_ativo ON tokens_cadastro(ativo);
 
 -- ================================================
 -- COMENTÁRIOS FINAIS
