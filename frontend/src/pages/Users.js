@@ -439,7 +439,11 @@ const Users = ({ openCreateModal = false }) => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const applyFilters = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
+    fetchUsers();
   };
 
   const handlePageChange = (page) => {
@@ -552,6 +556,10 @@ const Users = ({ openCreateModal = false }) => {
             <option value="0">Usuários Inativos</option>
           </select>
         )}
+
+        <Button onClick={applyFilters}>
+          Buscar
+        </Button>
       </FiltersContainer>
 
       <Card>

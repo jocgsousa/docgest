@@ -1,9 +1,11 @@
 <?php
 
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../models/Notification.php';
 require_once __DIR__ . '/../utils/JWT.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../utils/Validator.php';
+require_once __DIR__ . '/../config/database.php';
 
 class UserController {
     private $userModel;
@@ -947,6 +949,9 @@ class UserController {
                     $this->deactivateUserFromRequest($request['usuario_alvo_id']);
                 }
                 
+                // Enviar notificação para o usuário que criou a solicitação
+                $this->sendRequestStatusNotification($request, $input['status'], $currentUser['id'], $input['justificativa_resposta'] ?? null);
+                
                 Response::success([
                     'message' => 'Solicitação atualizada com sucesso',
                     'request_id' => $input['id']
@@ -973,6 +978,70 @@ class UserController {
             
         } catch (Exception $e) {
             error_log("Erro ao desativar usuário: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Envia notificação quando o status de uma solicitação é alterado
+     */
+    private function sendRequestStatusNotification($request, $newStatus, $adminId, $justificativa = null) {
+        try {
+            $notification = new Notification();
+            
+            // Definir título e mensagem baseado no status
+            $statusMessages = [
+                'aprovada' => [
+                    'titulo' => 'Solicitação Aprovada',
+                    'mensagem' => 'Sua solicitação foi aprovada pelo administrador.',
+                    'tipo' => 'success'
+                ],
+                'rejeitada' => [
+                    'titulo' => 'Solicitação Rejeitada',
+                    'mensagem' => 'Sua solicitação foi rejeitada pelo administrador.',
+                    'tipo' => 'error'
+                ],
+                'processada' => [
+                    'titulo' => 'Solicitação Processada',
+                    'mensagem' => 'Sua solicitação foi processada pelo administrador.',
+                    'tipo' => 'info'
+                ],
+                'pendente' => [
+                    'titulo' => 'Solicitação em Análise',
+                    'mensagem' => 'Sua solicitação está sendo analisada pelo administrador.',
+                    'tipo' => 'info'
+                ]
+            ];
+            
+            $statusInfo = $statusMessages[$newStatus] ?? $statusMessages['pendente'];
+            
+            // Adicionar justificativa à mensagem se fornecida
+            if ($justificativa) {
+                $statusInfo['mensagem'] .= "\n\nJustificativa: " . $justificativa;
+            }
+            
+            // Adicionar detalhes da solicitação
+            $statusInfo['mensagem'] .= "\n\nDetalhes da solicitação:\n";
+            $statusInfo['mensagem'] .= "Motivo: " . ucfirst($request['motivo']) . "\n";
+            if ($request['detalhes']) {
+                $statusInfo['mensagem'] .= "Detalhes: " . $request['detalhes'] . "\n";
+            }
+            $statusInfo['mensagem'] .= "Data da solicitação: " . date('d/m/Y H:i', strtotime($request['data_criacao']));
+            
+            // Criar dados da notificação
+            $notificationData = [
+                'titulo' => $statusInfo['titulo'],
+                'mensagem' => $statusInfo['mensagem'],
+                'tipo' => $statusInfo['tipo'],
+                'usuario_destinatario_id' => $request['usuario_solicitante_id'],
+                'usuario_remetente_id' => $adminId,
+                'empresa_id' => $request['empresa_id']
+            ];
+            
+            // Criar a notificação
+            $notification->create($notificationData);
+            
+        } catch (Exception $e) {
+            error_log("Erro ao enviar notificação de status: " . $e->getMessage());
         }
     }
 

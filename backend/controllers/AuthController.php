@@ -355,9 +355,10 @@ class AuthController {
             $userData = [
                 'nome' => $input['nome'],
                 'email' => $input['email'],
-                'senha' => password_hash($input['senha'], PASSWORD_DEFAULT),
+                'senha' => $input['senha'], // Remover hash duplo - o modelo User já faz o hash
                 'cpf' => $cpfLimpo,
                 'telefone' => $input['telefone'],
+                'profissao_id' => 12, // Profissão padrão 'Outros' para cadastro externo
                 'tipo_usuario' => $input['tipo_usuario'],
                 'empresa_id' => $input['empresa_id'],
                 'filial_id' => $filialId

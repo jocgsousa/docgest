@@ -264,7 +264,11 @@ const DocumentTypes = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const applyFilters = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
+    loadDocumentTypes();
   };
 
   const handlePageChange = (page) => {
@@ -313,6 +317,9 @@ const DocumentTypes = () => {
             </option>
           ))}
         </select>
+        <Button onClick={applyFilters}>
+          Buscar
+        </Button>
       </FiltersContainer>
 
       <Card>

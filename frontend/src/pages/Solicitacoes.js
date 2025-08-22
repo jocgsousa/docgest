@@ -257,12 +257,10 @@ const Solicitacoes = () => {
   };
 
   useEffect(() => {
-    console.log('Usuário atual:', user);
-    console.log('Token no localStorage:', localStorage.getItem('token'));
     fetchRequests();
   }, []);
 
-  const canEdit = user?.tipo === 'super_admin';
+  const canEdit = user?.tipo_usuario === 1;
 
   const columns = [
     {
@@ -322,7 +320,7 @@ const Solicitacoes = () => {
           >
             <Eye size={14} />
           </Button>
-          {canEdit && row.status === 'pendente' && (
+          {canEdit && (
             <Button
               size="sm"
               $variant="outline"
@@ -397,7 +395,7 @@ const Solicitacoes = () => {
         </select>
 
         <Button onClick={applyFilters}>
-          Aplicar Filtros
+          Buscar
         </Button>
       </FiltersContainer>
 
@@ -472,7 +470,7 @@ const Solicitacoes = () => {
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
                   Data da Solicitação
                 </label>
-                <p style={{ fontSize: '14px', margin: '0' }}>{formatDate(viewingRequest.data_criacao)}</p>
+                <p style={{ fontSize: '14px', margin: '0' }}>{formatDate(viewingRequest.data_solicitacao)}</p>
               </div>
               
               {viewingRequest.detalhes && (

@@ -38,8 +38,18 @@ class UsageController {
             
             $empresaId = $currentUser['empresa_id'];
             
-            // Buscar dados do plano da empresa
-            $planUsage = $this->companyModel->getPlanUsage($empresaId);
+            // Obter parâmetros de data da requisição
+            $startDate = $_GET['start_date'] ?? null;
+            $endDate = $_GET['end_date'] ?? null;
+            
+            // Se não foram fornecidas datas, usar o mês atual
+            if (!$startDate || !$endDate) {
+                $startDate = date('Y-m-01'); // Primeiro dia do mês atual
+                $endDate = date('Y-m-t');    // Último dia do mês atual
+            }
+            
+            // Buscar dados do plano da empresa com filtro de data
+            $planUsage = $this->companyModel->getPlanUsageByDateRange($empresaId, $startDate, $endDate);
             
             if (!$planUsage) {
                 Response::error('Empresa não encontrada', 404);
@@ -70,7 +80,7 @@ class UsageController {
             $response = [
                 'current_period' => [
                     'documents_sent' => (int)$planUsage['documentos_usados'],
-                    'documents_signed' => $this->signatureModel->countByCompany($empresaId),
+                    'documents_signed' => $this->signatureModel->countByCompanyAndDateRange($empresaId, $startDate, $endDate),
                     'storage_used_mb' => $storageUsedMb,
                     'api_calls' => 0, // Pode ser implementado futuramente
                     'whatsapp_messages' => 0 // Pode ser implementado futuramente
@@ -84,8 +94,8 @@ class UsageController {
                 'days_remaining' => $daysRemaining,
                 'plan_name' => $plano ? $plano['nome'] : 'Plano Atual',
                 'plan_days' => $plano ? (int)$plano['dias'] : 30,
-                'period_start' => $empresa['data_criacao'],
-                'period_end' => $empresa['data_vencimento'],
+                'period_start' => $startDate,
+                'period_end' => $endDate,
                 'billing_cycle' => 'plan_based',
                 'plan_expired' => $daysRemaining === 0
             ];

@@ -30,36 +30,7 @@ const FiltersContainer = styled.div`
   flex-wrap: wrap;
 `;
 
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-`;
 
-const StatCard = styled(Card)`
-  text-align: center;
-  padding: 24px;
-`;
-
-const StatValue = styled.div`
-  font-size: 32px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.primary};
-  margin-bottom: 8px;
-`;
-
-const StatLabel = styled.div`
-  font-size: 14px;
-  color: ${props => props.theme.colors.textSecondary};
-  font-weight: 500;
-`;
-
-const StatSubtext = styled.div`
-  font-size: 12px;
-  color: ${props => props.theme.colors.textSecondary};
-  margin-top: 4px;
-`;
 
 const ChartCard = styled(Card)`
   margin-bottom: 24px;
@@ -136,8 +107,40 @@ const AlertText = styled.p`
   margin: 0;
 `;
 
+const LoadingState = styled.div`
+  padding: 48px 24px;
+  text-align: center;
+  color: #6b7280;
+`;
+
+const LoadingSpinner = styled.div`
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f4f6;
+  border-radius: 50%;
+  border-top-color: #3b82f6;
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 16px;
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 function Usage() {
   const { user } = useAuth();
+  
+  // Função para formatar data sem problemas de fuso horário
+  const formatDateWithoutTimezone = (dateString) => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('pt-BR');
+  };
+  
   const [usage, setUsage] = useState({
     current_period: {
       documents_sent: 0,
@@ -159,18 +162,52 @@ function Usage() {
   const [history, setHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Função para obter o primeiro dia do mês atual
+  const getFirstDayOfMonth = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-01`;
+  };
+
+  // Função para obter o último dia do mês atual
+  const getLastDayOfMonth = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const lastDay = new Date(year, month, 0).getDate();
+    const monthStr = String(month).padStart(2, '0');
+    const dayStr = String(lastDay).padStart(2, '0');
+    return `${year}-${monthStr}-${dayStr}`;
+  };
+
+  // Inicializar as datas com o primeiro e último dia do mês atual
+  useEffect(() => {
+    if (!startDate && !endDate) {
+      setStartDate(getFirstDayOfMonth());
+      setEndDate(getLastDayOfMonth());
+    }
+  }, []);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchUsage();
-    fetchHistory();
-  }, [selectedMonth]);
+    if (startDate && endDate) {
+      fetchUsage();
+      fetchHistory();
+    }
+  }, [startDate, endDate]);
 
   const fetchUsage = async () => {
     try {
       setLoading(true);
-      const params = selectedMonth ? { month: selectedMonth } : {};
+      const params = {};
+      if (startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      }
       const response = await api.get('/usage/current', { params });
       setUsage(response.data.data);
     } catch (error) {
@@ -260,26 +297,34 @@ function Usage() {
       <PageHeader>
         <PageTitle>Uso Mensal</PageTitle>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px'
-            }}
-          >
-            <option value="">Mês atual</option>
-            {history && history.length > 0 && history.map((item) => (
-              <option key={item.month} value={item.month}>
-                {new Date(item.month + '-01').toLocaleDateString('pt-BR', { 
-                  year: 'numeric', 
-                  month: 'long' 
-                })}
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <label style={{ fontSize: '14px', fontWeight: '500' }}>De:</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <label style={{ fontSize: '14px', fontWeight: '500' }}>Até:</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
           <Button onClick={fetchUsage}>
             Atualizar
           </Button>
@@ -305,97 +350,80 @@ function Usage() {
         </AlertCard>
       ))}
 
-      <StatsGrid>
-        <StatCard>
-          <StatValue>{usage.current_period?.documents_sent || 0}</StatValue>
-          <StatLabel>Documentos Enviados</StatLabel>
-          <StatSubtext>de {usage.limits?.documents_per_month || 0} permitidos</StatSubtext>
-        </StatCard>
-        
-        <StatCard>
-          <StatValue>{usage.current_period?.documents_signed || 0}</StatValue>
-          <StatLabel>Documentos Assinados</StatLabel>
-          <StatSubtext>neste período</StatSubtext>
-        </StatCard>
-        
-        <StatCard>
-          <StatValue>{formatBytes((usage.current_period?.storage_used_mb || 0) * 1024 * 1024)}</StatValue>
-          <StatLabel>Armazenamento Usado</StatLabel>
-          <StatSubtext>de {formatBytes((usage.limits?.storage_limit_mb || 0) * 1024 * 1024)} disponível</StatSubtext>
-        </StatCard>
-        
-        <StatCard>
-          <StatValue>{usage.days_remaining || 0}</StatValue>
-          <StatLabel>Dias Restantes</StatLabel>
-          <StatSubtext>no período atual</StatSubtext>
-        </StatCard>
-      </StatsGrid>
-
       <ChartCard>
         <ChartTitle>Uso Detalhado</ChartTitle>
         
-        <UsageItem>
-          <div>
-            <UsageLabel>Documentos Enviados</UsageLabel>
-            <ProgressBar>
-              <ProgressFill 
-                percentage={calculatePercentage(usage.current_period?.documents_sent || 0, usage.limits?.documents_per_month || 1)} 
-              />
-            </ProgressBar>
-          </div>
-          <UsageValue>
-            {usage.current_period?.documents_sent || 0} / {usage.limits?.documents_per_month || 0}
-          </UsageValue>
-        </UsageItem>
+        {loading ? (
+          <LoadingState>
+            <LoadingSpinner />
+            <p>Carregando dados...</p>
+          </LoadingState>
+        ) : (
+          <>
+            <UsageItem>
+              <div>
+                <UsageLabel>Documentos Enviados</UsageLabel>
+                <ProgressBar>
+                  <ProgressFill 
+                    percentage={calculatePercentage(usage.current_period?.documents_sent || 0, usage.limits?.documents_per_month || 1)} 
+                  />
+                </ProgressBar>
+              </div>
+              <UsageValue>
+                {usage.current_period?.documents_sent || 0} / {usage.limits?.documents_per_month || 0}
+              </UsageValue>
+            </UsageItem>
         
-        <UsageItem>
-          <div>
-            <UsageLabel>Armazenamento</UsageLabel>
-            <ProgressBar>
-              <ProgressFill 
-                percentage={calculatePercentage(usage.current_period?.storage_used_mb || 0, usage.limits?.storage_limit_mb || 1)} 
-              />
-            </ProgressBar>
-          </div>
-          <UsageValue>
-            {formatBytes((usage.current_period?.storage_used_mb || 0) * 1024 * 1024)} / {formatBytes((usage.limits?.storage_limit_mb || 0) * 1024 * 1024)}
-          </UsageValue>
-        </UsageItem>
-        
-        <UsageItem>
-          <div>
-            <UsageLabel>Chamadas da API</UsageLabel>
-            <ProgressBar>
-              <ProgressFill 
-                percentage={calculatePercentage(usage.current_period?.api_calls || 0, usage.limits?.api_calls_per_month || 1)} 
-              />
-            </ProgressBar>
-          </div>
-          <UsageValue>
-            {usage.current_period?.api_calls || 0} / {usage.limits?.api_calls_per_month || 0}
-          </UsageValue>
-        </UsageItem>
-        
-        <UsageItem>
-          <div>
-            <UsageLabel>Mensagens WhatsApp</UsageLabel>
-            <ProgressBar>
-              <ProgressFill 
-                percentage={calculatePercentage(usage.current_period?.whatsapp_messages || 0, usage.limits?.whatsapp_messages_per_month || 1)} 
-              />
-            </ProgressBar>
-          </div>
-          <UsageValue>
-            {usage.current_period?.whatsapp_messages || 0} / {usage.limits?.whatsapp_messages_per_month || 0}
-          </UsageValue>
-        </UsageItem>
+            <UsageItem>
+              <div>
+                <UsageLabel>Armazenamento</UsageLabel>
+                <ProgressBar>
+                  <ProgressFill 
+                    percentage={calculatePercentage(usage.current_period?.storage_used_mb || 0, usage.limits?.storage_limit_mb || 1)} 
+                  />
+                </ProgressBar>
+              </div>
+              <UsageValue>
+                {formatBytes((usage.current_period?.storage_used_mb || 0) * 1024 * 1024)} / {formatBytes((usage.limits?.storage_limit_mb || 0) * 1024 * 1024)}
+              </UsageValue>
+            </UsageItem>
+            
+            <UsageItem>
+              <div>
+                <UsageLabel>Chamadas da API</UsageLabel>
+                <ProgressBar>
+                  <ProgressFill 
+                    percentage={calculatePercentage(usage.current_period?.api_calls || 0, usage.limits?.api_calls_per_month || 1)} 
+                  />
+                </ProgressBar>
+              </div>
+              <UsageValue>
+                {usage.current_period?.api_calls || 0} / {usage.limits?.api_calls_per_month || 0}
+              </UsageValue>
+            </UsageItem>
+            
+            <UsageItem>
+              <div>
+                <UsageLabel>Mensagens WhatsApp</UsageLabel>
+                <ProgressBar>
+                  <ProgressFill 
+                    percentage={calculatePercentage(usage.current_period?.whatsapp_messages || 0, usage.limits?.whatsapp_messages_per_month || 1)} 
+                  />
+                </ProgressBar>
+              </div>
+              <UsageValue>
+                {usage.current_period?.whatsapp_messages || 0} / {usage.limits?.whatsapp_messages_per_month || 0}
+              </UsageValue>
+            </UsageItem>
+          </>
+        )}
       </ChartCard>
 
       {usage.period_start && usage.period_end && (
         <Card>
           <ChartTitle>Período Atual</ChartTitle>
           <p style={{ color: '#6b7280', margin: 0 }}>
-            De {new Date(usage.period_start).toLocaleDateString('pt-BR')} até {new Date(usage.period_end).toLocaleDateString('pt-BR')}
+            De {formatDateWithoutTimezone(usage.period_start)} até {formatDateWithoutTimezone(usage.period_end)}
           </p>
         </Card>
       )}

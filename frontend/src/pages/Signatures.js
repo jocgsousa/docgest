@@ -366,7 +366,11 @@ const Signatures = () => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const applyFilters = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
+    fetchSignatures();
   };
 
   const handlePageChange = (page) => {
@@ -449,6 +453,9 @@ const Signatures = () => {
             </option>
           ))}
         </select>
+        <Button onClick={applyFilters}>
+          Buscar
+        </Button>
       </FiltersContainer>
 
       <Card>

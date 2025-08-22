@@ -275,7 +275,11 @@ function Branches({ openCreateModal = false }) {
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilters = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
+    fetchBranches();
   };
 
   const handlePageChange = (page) => {
@@ -311,6 +315,9 @@ function Branches({ openCreateModal = false }) {
           <option value="ativo">Ativo</option>
           <option value="inativo">Inativo</option>
         </select>
+        <Button onClick={applyFilters}>
+          Buscar
+        </Button>
       </FiltersContainer>
 
       {error && (

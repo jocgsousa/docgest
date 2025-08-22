@@ -352,6 +352,22 @@ class Signature {
         return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     }
     
+    /**
+     * Conta assinaturas por empresa em um intervalo de datas
+     */
+    public function countByCompanyAndDateRange($companyId, $startDate, $endDate) {
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} 
+                WHERE empresa_id = :company_id AND ativo = 1 
+                AND DATE(data_criacao) BETWEEN :start_date AND :end_date";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':company_id', $companyId);
+        $stmt->bindParam(':start_date', $startDate);
+        $stmt->bindParam(':end_date', $endDate);
+        $stmt->execute();
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+    
     public function getSignerByToken($token) {
         $sql = "SELECT s.*, a.documento_id, d.titulo as documento_titulo, d.caminho_arquivo 
                 FROM signatarios s 

@@ -107,29 +107,7 @@ const FileInfo = styled.div`
   margin-top: 8px;
 `;
 
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-`;
 
-const StatCard = styled(Card)`
-  text-align: center;
-  padding: 20px;
-`;
-
-const StatValue = styled.div`
-  font-size: 24px;
-  font-weight: 600;
-  color: ${props => props.theme.colors.primary};
-  margin-bottom: 4px;
-`;
-
-const StatLabel = styled.div`
-  font-size: 14px;
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
 const ViewModal = styled.div`
   position: fixed;
@@ -223,7 +201,7 @@ const DownloadMessage = styled.div`
 const Documents = ({ openCreateModal = false }) => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
-  const [stats, setStats] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(openCreateModal);
   const [editingDocument, setEditingDocument] = useState(null);
@@ -242,7 +220,8 @@ const Documents = ({ openCreateModal = false }) => {
   });
   const [filters, setFilters] = useState({
     search: '',
-    status: ''
+    status: '',
+    tipo_documento_id: ''
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -352,7 +331,6 @@ const Documents = ({ openCreateModal = false }) => {
 
   useEffect(() => {
     fetchDocuments();
-    fetchStats();
   }, [filters, pagination.page]);
 
   useEffect(() => {
@@ -469,14 +447,7 @@ const Documents = ({ openCreateModal = false }) => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await api.get('/documents/stats');
-      setStats(response.data.data);
-    } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
-    }
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -530,7 +501,6 @@ const Documents = ({ openCreateModal = false }) => {
       setEditingDocument(null);
       resetForm();
       fetchDocuments();
-      fetchStats();
     } catch (error) {
       if (error.response?.data?.errors) {
         setErrors(formatErrors(error.response.data.errors));
@@ -756,7 +726,6 @@ const Documents = ({ openCreateModal = false }) => {
       try {
         await api.delete(`/documents/${documentId}`);
         fetchDocuments();
-        fetchStats();
       } catch (error) {
         console.error('Erro ao excluir documento:', error);
         if (error.response?.data?.message) {
@@ -785,7 +754,11 @@ const Documents = ({ openCreateModal = false }) => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const applyFilters = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
+    fetchDocuments();
   };
 
   const handlePageChange = (page) => {
@@ -869,26 +842,7 @@ const Documents = ({ openCreateModal = false }) => {
         </Button>
       </PageHeader>
 
-      {stats && (
-        <StatsGrid>
-          <StatCard>
-            <StatValue>{stats.geral.total_documentos}</StatValue>
-            <StatLabel>Total de Documentos</StatLabel>
-          </StatCard>
-          <StatCard>
-            <StatValue>{stats.por_status.rascunho || 0}</StatValue>
-            <StatLabel>Rascunhos</StatLabel>
-          </StatCard>
-          <StatCard>
-            <StatValue>{stats.por_status.enviado || 0}</StatValue>
-            <StatLabel>Enviados</StatLabel>
-          </StatCard>
-          <StatCard>
-            <StatValue>{stats.por_status.assinado || 0}</StatValue>
-            <StatLabel>Assinados</StatLabel>
-          </StatCard>
-        </StatsGrid>
-      )}
+
 
       <FiltersContainer>
         <Input
@@ -913,6 +867,27 @@ const Documents = ({ openCreateModal = false }) => {
             </option>
           ))}
         </select>
+        <select
+          value={filters.tipo_documento_id}
+          onChange={(e) => handleFilterChange('tipo_documento_id', e.target.value)}
+          style={{
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            fontSize: '14px',
+            minWidth: '150px'
+          }}
+        >
+          <option value="">Todas as classificações</option>
+          {Array.isArray(documentTypes) && documentTypes.map(type => (
+            <option key={type.id} value={type.id}>
+              {type.nome}
+            </option>
+          ))}
+        </select>
+        <Button onClick={applyFilters}>
+          Buscar
+        </Button>
       </FiltersContainer>
 
       <Card>

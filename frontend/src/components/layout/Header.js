@@ -14,7 +14,8 @@ import {
   User, 
   Settings, 
   LogOut,
-  X 
+  X,
+  Trash2
 } from 'lucide-react';
 
 const HeaderContainer = styled.header`
@@ -257,9 +258,12 @@ const NotificationList = styled.div`
 const NotificationItem = styled.div`
   padding: 12px 16px;
   border-bottom: 1px solid ${props => props.theme.colors.gray[100]};
-  cursor: pointer;
   transition: background-color 0.2s;
   background-color: ${props => props.unread ? props.theme.colors.gray[50] : 'transparent'};
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
   
   &:hover {
     background-color: ${props => props.theme.colors.gray[100]};
@@ -267,6 +271,37 @@ const NotificationItem = styled.div`
   
   &:last-child {
     border-bottom: none;
+  }
+`;
+
+const NotificationContent = styled.div`
+  flex: 1;
+  cursor: pointer;
+`;
+
+const NotificationActions = styled.div`
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+`;
+
+const DeleteButton = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.theme.colors.gray[400]};
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  opacity: 0;
+  
+  ${NotificationItem}:hover & {
+    opacity: 1;
+  }
+  
+  &:hover {
+    color: ${props => props.theme.colors.red};
+    background-color: ${props => props.theme.colors.red}10;
   }
 `;
 
@@ -435,6 +470,29 @@ function Header({
     }
   };
 
+  const handleDeleteNotification = async (notificationId, event) => {
+    event.stopPropagation(); // Evitar que o clique abra a notificação
+    
+    try {
+      await api.delete(`/notifications/${notificationId}`);
+      
+      // Remover a notificação da lista
+      setNotifications(prev => {
+        const updatedNotifications = prev.filter(n => n.id !== notificationId);
+        return updatedNotifications;
+      });
+      
+      // Atualizar contador de não lidas se necessário
+      const deletedNotification = notifications.find(n => n.id === notificationId);
+      if (deletedNotification && !deletedNotification.lida) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+      
+    } catch (error) {
+      console.error('Erro ao excluir notificação:', error);
+    }
+  };
+
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications);
     if (!showNotifications) {
@@ -530,13 +588,22 @@ function Header({
                   <NotificationItem
                     key={notification.id}
                     unread={!notification.lida}
-                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <NotificationItemTitle>{notification.titulo}</NotificationItemTitle>
-                    <NotificationItemMessage>{notification.mensagem}</NotificationItemMessage>
-                    <NotificationItemTime>
-                      {formatNotificationTime(notification.data_criacao)}
-                    </NotificationItemTime>
+                    <NotificationContent onClick={() => handleNotificationClick(notification)}>
+                      <NotificationItemTitle>{notification.titulo}</NotificationItemTitle>
+                      <NotificationItemMessage>{notification.mensagem}</NotificationItemMessage>
+                      <NotificationItemTime>
+                        {formatNotificationTime(notification.data_criacao)}
+                      </NotificationItemTime>
+                    </NotificationContent>
+                    <NotificationActions>
+                      <DeleteButton
+                        onClick={(e) => handleDeleteNotification(notification.id, e)}
+                        title="Excluir notificação"
+                      >
+                        <Trash2 size={14} />
+                      </DeleteButton>
+                    </NotificationActions>
                   </NotificationItem>
                 ))
               )}
