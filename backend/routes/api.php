@@ -6,6 +6,7 @@ require_once __DIR__ . '/../controllers/UserController.php';
 require_once __DIR__ . '/../controllers/CompanyController.php';
 require_once __DIR__ . '/../controllers/PlanController.php';
 require_once __DIR__ . '/../controllers/DocumentController.php';
+require_once __DIR__ . '/../controllers/DocumentTypeController.php';
 require_once __DIR__ . '/../controllers/SignatureController.php';
 require_once __DIR__ . '/../controllers/DashboardController.php';
 require_once __DIR__ . '/../controllers/ReportController.php';
@@ -53,6 +54,11 @@ try {
     $id = $segments[1] ?? null;
     $action = $segments[2] ?? null;
     
+    // Verificar se action está nos query parameters
+    if ($action === null && isset($_GET['action'])) {
+        $action = $_GET['action'];
+    }
+    
     // Rota pública para informações da aplicação
     if ($resource === 'app-info' && $method === 'GET') {
         $settingsController = new SettingsController();
@@ -78,6 +84,8 @@ try {
                         $controller->login();
                     } elseif ($id === 'register') {
                         $controller->register();
+                    } elseif ($id === 'register-external') {
+                        $controller->registerExternal();
                     } elseif ($id === 'logout') {
                         $controller->logout();
                     } else {
@@ -120,6 +128,8 @@ try {
                         $controller->stats();
                     } elseif ($id === 'by-company-branch') {
                         $controller->getByCompanyAndBranch();
+                    } elseif ($id === 'deletion-requests') {
+                        $controller->listDeletionRequests();
                     } elseif ($action === null) {
                         $controller->show($id);
                     } elseif ($action === 'empresa') {
@@ -134,6 +144,10 @@ try {
                 case 'POST':
                     if ($id === null) {
                         $controller->store();
+                    } elseif ($id === 'request-deletion') {
+                        $controller->requestDeletion();
+                    } elseif ($id === 'update-deletion-request') {
+                        $controller->updateDeletionRequest();
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -142,6 +156,24 @@ try {
                 case 'PUT':
                     if ($id !== null && $action === null) {
                         $controller->update($id);
+                    } elseif ($id !== null && $action === 'deactivate') {
+                        $controller->deactivate($id);
+                    } elseif ($id !== null && $action === 'activate') {
+                        $controller->activate($id);
+                    } elseif ($id !== null && $action === 'reject-deletion') {
+                        $controller->rejectDeletion($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'PUT':
+                    if ($id !== null && $action === null) {
+                        $controller->update($id);
+                    } elseif ($id !== null && $action === 'deactivate') {
+                        $controller->deactivate($id);
+                    } elseif ($id !== null && $action === 'activate') {
+                        $controller->activate($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -150,6 +182,8 @@ try {
                 case 'DELETE':
                     if ($id !== null && $action === null) {
                         $controller->destroy($id);
+                    } elseif ($id !== null && $action === 'permanent') {
+                        $controller->delete($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -398,6 +432,50 @@ try {
                         $controller->update($id);
                     } elseif ($id !== null && $action === 'status') {
                         $controller->updateStatus($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'DELETE':
+                    if ($id !== null && $action === null) {
+                        $controller->destroy($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                default:
+                    Response::error('Método não permitido', 405);
+            }
+            break;
+            
+        // Rotas de Tipos de Documentos
+        case 'document-types':
+            $controller = new DocumentTypeController();
+            
+            switch ($method) {
+                case 'GET':
+                    if ($id === null) {
+                        $controller->index();
+                    } elseif ($action === null) {
+                        $controller->show($id);
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'POST':
+                    if ($id === null) {
+                        $controller->store();
+                    } else {
+                        Response::notFound('Endpoint não encontrado');
+                    }
+                    break;
+                    
+                case 'PUT':
+                    if ($id !== null && $action === null) {
+                        $controller->update($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }

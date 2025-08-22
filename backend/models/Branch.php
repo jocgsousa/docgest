@@ -255,6 +255,23 @@ class Branch {
         $result = $stmt->fetch();
         return $result ? (int)$result['total'] : 0;
     }
+    
+    /**
+     * Busca a primeira filial (matriz) de uma empresa
+     */
+    public function getMatrizByEmpresa($empresaId) {
+        $sql = "SELECT f.*
+                FROM {$this->table} f
+                WHERE f.empresa_id = :empresa_id AND f.ativo = 1
+                ORDER BY f.id ASC
+                LIMIT 1";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':empresa_id', $empresaId);
+        $stmt->execute();
+        
+        return $stmt->fetch();
+    }
 }
 
 ?>

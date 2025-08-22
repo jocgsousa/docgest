@@ -167,6 +167,24 @@ class JWT {
         
         return $user;
     }
+    
+    /**
+     * Middleware para verificar se é super admin (tipo 1)
+     */
+    public static function requireSuperAdmin() {
+        $user = self::requireAuth();
+        
+        if ($user['tipo_usuario'] != 1) {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Acesso negado. Apenas super administradores podem acessar este recurso.'
+            ]);
+            exit();
+        }
+        
+        return $user;
+    }
 }
 
 ?>

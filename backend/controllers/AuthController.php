@@ -281,6 +281,105 @@ class AuthController {
     }
     
     /**
+     * Registro externo de assinante (sem autenticação)
+     */
+    public function registerExternal() {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            // Mapear campos do frontend para o backend
+            if (isset($input['tipo']) && !isset($input['tipo_usuario'])) {
+                // Mapear tipo para tipo_usuario
+                $tipoMap = [
+                    'assinante' => 3,
+                    'admin' => 2,
+                    'super_admin' => 1
+                ];
+                $input['tipo_usuario'] = $tipoMap[$input['tipo']] ?? 3; // Default para assinante
+            }
+            
+            // Buscar empresa pelo código
+            if (isset($input['codigoEmpresa'])) {
+                require_once __DIR__ . '/../models/Company.php';
+                $companyModel = new Company();
+                $empresa = $companyModel->findByCode($input['codigoEmpresa']);
+                
+                if (!$empresa) {
+                    Response::error('Código da empresa não encontrado', 400);
+                    return;
+                }
+                
+                $input['empresa_id'] = $empresa['id'];
+            }
+            
+            // Validações básicas primeiro
+            $validator = Validator::make($input)
+                ->required('nome', 'Nome é obrigatório')
+                ->min('nome', 2, 'Nome deve ter pelo menos 2 caracteres')
+                ->max('nome', 100, 'Nome deve ter no máximo 100 caracteres')
+                ->required('email', 'Email é obrigatório')
+                ->email('email', 'Email deve ser válido')
+                ->required('senha', 'Senha é obrigatória')
+                ->min('senha', 6, 'Senha deve ter pelo menos 6 caracteres')
+                ->required('cpf', 'CPF é obrigatório')
+                ->cpf('cpf', 'CPF deve ser válido')
+                ->required('telefone', 'Telefone é obrigatório')
+                ->required('empresa_id', 'Empresa é obrigatória')
+                ->exists('empresa_id', 'empresas', 'id', 'Empresa não encontrada');
+            
+            // Verificar se email já existe
+            if ($this->userModel->emailExists($input['email'])) {
+                Response::error('Este email já está cadastrado no sistema', 409);
+            }
+            
+            // Verificar se CPF já existe
+            $cpfLimpo = preg_replace('/[^0-9]/', '', $input['cpf']);
+            if ($this->userModel->cpfExists($cpfLimpo)) {
+                Response::error('Este CPF já está cadastrado no sistema', 409);
+            }
+            
+            // Para cadastro externo, sempre será assinante (tipo 3)
+            $input['tipo_usuario'] = 3;
+            
+            // Buscar filial matriz da empresa para definir como padrão
+            require_once __DIR__ . '/../models/Branch.php';
+            $branchModel = new Branch();
+            $matrizFilial = $branchModel->getMatrizByEmpresa($input['empresa_id']);
+            
+            $filialId = null;
+            if ($matrizFilial) {
+                $filialId = $matrizFilial['id'];
+            }
+            
+            // Criar usuário
+            $userData = [
+                'nome' => $input['nome'],
+                'email' => $input['email'],
+                'senha' => password_hash($input['senha'], PASSWORD_DEFAULT),
+                'cpf' => $cpfLimpo,
+                'telefone' => $input['telefone'],
+                'tipo_usuario' => $input['tipo_usuario'],
+                'empresa_id' => $input['empresa_id'],
+                'filial_id' => $filialId
+            ];
+            
+            $user = $this->userModel->create($userData);
+            
+            if (!$user) {
+                Response::error('Erro ao criar usuário', 500);
+            }
+            
+            // Remover senha dos dados retornados
+            unset($user['senha']);
+            
+            Response::created($user, 'Usuário criado com sucesso');
+            
+        } catch (Exception $e) {
+            Response::handleException($e);
+        }
+    }
+    
+    /**
      * Logout (invalidar token - implementação básica)
      */
     public function logout() {

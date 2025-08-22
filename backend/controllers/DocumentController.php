@@ -158,7 +158,11 @@ class DocumentController {
                 'empresa_id' => $_POST['empresa_id'] ?? '',
                 'filial_id' => $_POST['filial_id'] ?? null,
                 'assinantes' => $_POST['assinantes'] ?? '',
-                'status' => $_POST['status'] ?? 'rascunho'
+                'status' => $_POST['status'] ?? 'rascunho',
+                'tipo_documento_id' => $_POST['tipo_documento_id'] ?? null,
+                'prazo_assinatura' => $_POST['prazo_assinatura'] ?? null,
+                'competencia' => $_POST['competencia'] ?? null,
+                'validade_legal' => $_POST['validade_legal'] ?? null
             ];
             
             $validator = new Validator($data);
@@ -249,7 +253,11 @@ class DocumentController {
                 'status' => $data['status'],
                 'criado_por' => $user['user_id'],
                 'empresa_id' => $data['empresa_id'],
-                'filial_id' => $data['filial_id']
+                'filial_id' => $data['filial_id'],
+                'tipo_documento_id' => $data['tipo_documento_id'],
+                'prazo_assinatura' => $data['prazo_assinatura'],
+                'competencia' => $data['competencia'],
+                'validade_legal' => $data['validade_legal']
             ];
             
             // Remove campos nulos para evitar erros de constraint
@@ -352,7 +360,11 @@ class DocumentController {
                 'descricao' => isset($_POST['descricao']) ? $_POST['descricao'] : $document['descricao'],
                 'empresa_id' => isset($_POST['empresa_id']) ? $_POST['empresa_id'] : $document['empresa_id'],
                 'filial_id' => isset($_POST['filial_id']) ? $_POST['filial_id'] : $document['filial_id'],
-                'status' => isset($_POST['status']) ? $_POST['status'] : $document['status']
+                'status' => isset($_POST['status']) ? $_POST['status'] : $document['status'],
+                'tipo_documento_id' => isset($_POST['tipo_documento_id']) ? $_POST['tipo_documento_id'] : $document['tipo_documento_id'],
+                'prazo_assinatura' => isset($_POST['prazo_assinatura']) ? $_POST['prazo_assinatura'] : $document['prazo_assinatura'],
+                'competencia' => isset($_POST['competencia']) ? $_POST['competencia'] : $document['competencia'],
+                'validade_legal' => isset($_POST['validade_legal']) ? $_POST['validade_legal'] : $document['validade_legal']
             ];
             
             if (!$this->validator->validate($data, $rules)) {
@@ -372,7 +384,11 @@ class DocumentController {
                 'descricao' => $data['descricao'],
                 'empresa_id' => $data['empresa_id'],
                 'filial_id' => $data['filial_id'],
-                'status' => $data['status']
+                'status' => $data['status'],
+                'tipo_documento_id' => $data['tipo_documento_id'],
+                'prazo_assinatura' => $data['prazo_assinatura'],
+                'competencia' => $data['competencia'],
+                'validade_legal' => $data['validade_legal']
             ];
             
             // Verificar se o documento possui hash_acesso, se não tiver, gerar um
@@ -813,6 +829,20 @@ class DocumentController {
         }
         
         return false;
+    }
+    
+    /**
+     * Busca todos os tipos de documentos ativos
+     */
+    public function getDocumentTypes() {
+        try {
+            JWT::requireAuth();
+            
+            $types = $this->document->getDocumentTypes();
+            Response::success($types);
+        } catch (Exception $e) {
+            Response::error('Erro ao buscar tipos de documentos: ' . $e->getMessage());
+        }
     }
     
     /**

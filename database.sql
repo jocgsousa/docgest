@@ -103,6 +103,18 @@ CREATE TABLE usuarios (
 );
 
 -- ================================================
+-- TIPOS DE DOCUMENTOS
+-- ================================================
+CREATE TABLE tipos_documentos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    descricao TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ================================================
 -- DOCUMENTOS
 -- ================================================
 CREATE TABLE documentos (
@@ -115,6 +127,10 @@ CREATE TABLE documentos (
     tipo_arquivo VARCHAR(100),
     hash_acesso VARCHAR(64) UNIQUE NOT NULL,
     status ENUM('rascunho','enviado','assinado','cancelado') DEFAULT 'rascunho',
+    tipo_documento_id INT,
+    prazo_assinatura DATE COMMENT 'Data limite até quando o documento pode ser assinado',
+    competencia DATE COMMENT 'Mês/ano de competência do documento (ex: folha de pagamento)',
+    validade_legal DATE COMMENT 'Data de validade legal do documento (se aplicável)',
     criado_por INT NOT NULL,
     empresa_id INT NOT NULL,
     filial_id INT,
@@ -123,7 +139,8 @@ CREATE TABLE documentos (
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (criado_por) REFERENCES usuarios(id),
     FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
-    FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL
+    FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL,
+    FOREIGN KEY (tipo_documento_id) REFERENCES tipos_documentos(id) ON DELETE SET NULL
 );
 
 -- ================================================
@@ -210,6 +227,21 @@ INSERT INTO profissoes (nome, descricao) VALUES
 ('Empresário', 'Proprietário de empresa'),
 ('Outros', 'Outras profissões não listadas');
 
+-- Tipos de documentos padrão
+INSERT INTO tipos_documentos (nome, descricao) VALUES
+('Contrato', 'Contratos em geral'),
+('Holerite', 'Folha de pagamento'),
+('Declaração', 'Declarações diversas'),
+('Procuração', 'Procurações e mandatos'),
+('Termo de Compromisso', 'Termos de compromisso e responsabilidade'),
+('Ata', 'Atas de reunião'),
+('Relatório', 'Relatórios técnicos e gerenciais'),
+('Proposta Comercial', 'Propostas e orçamentos'),
+('Acordo', 'Acordos e termos'),
+('Certificado', 'Certificados diversos'),
+('Autorização', 'Autorizações e permissões'),
+('Outros', 'Outros tipos de documentos');
+
 -- Empresa exemplo
 INSERT INTO empresas (nome, cnpj, codigo_empresa, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
 ('Empresa Exemplo LTDA', '95264309000103', 'EMP001', 'contato@exemplo.com', '(11) 99999-0000', 'Rua Exemplo, 123', 'São Paulo', 'SP', '01234-567', 1, DATE_ADD(CURDATE(), INTERVAL 30 DAY));
@@ -238,8 +270,14 @@ CREATE INDEX idx_usuarios_profissao ON usuarios(profissao_id);
 CREATE INDEX idx_profissoes_nome ON profissoes(nome);
 CREATE INDEX idx_profissoes_ativo ON profissoes(ativo);
 CREATE INDEX idx_empresas_cnpj ON empresas(cnpj);
+CREATE INDEX idx_tipos_documentos_nome ON tipos_documentos(nome);
+CREATE INDEX idx_tipos_documentos_ativo ON tipos_documentos(ativo);
 CREATE INDEX idx_documentos_empresa ON documentos(empresa_id);
 CREATE INDEX idx_documentos_status ON documentos(status);
+CREATE INDEX idx_documentos_tipo ON documentos(tipo_documento_id);
+CREATE INDEX idx_documentos_prazo_assinatura ON documentos(prazo_assinatura);
+CREATE INDEX idx_documentos_competencia ON documentos(competencia);
+CREATE INDEX idx_documentos_validade_legal ON documentos(validade_legal);
 CREATE INDEX idx_assinaturas_documento ON assinaturas(documento_id);
 CREATE INDEX idx_assinaturas_status ON assinaturas(status);
 CREATE UNIQUE INDEX idx_signatarios_token ON signatarios(token);
@@ -288,6 +326,11 @@ SELECT
     d.tamanho_arquivo,
     d.tipo_arquivo,
     d.status,
+    d.tipo_documento_id,
+    td.nome as tipo_documento_nome,
+    d.prazo_assinatura,
+    d.competencia,
+    d.validade_legal,
     d.criado_por,
     u.nome as criado_por_nome,
     d.empresa_id,
@@ -300,6 +343,7 @@ FROM documentos d
 LEFT JOIN usuarios u ON d.criado_por = u.id
 LEFT JOIN empresas e ON d.empresa_id = e.id
 LEFT JOIN filiais f ON d.filial_id = f.id
+LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id
 WHERE d.ativo = 1;
 
 -- View para assinaturas com informações completas
@@ -436,6 +480,35 @@ INSERT INTO configuracoes (chave, valor, tipo, descricao, categoria) VALUES
 ('signature_expiration_days', '30', 'number', 'Dias para expiração de assinatura', 'assinatura'),
 ('auto_reminder_days', '7', 'number', 'Dias para lembrete automático', 'assinatura'),
 ('max_signers_per_document', '10', 'number', 'Máximo de signatários por documento', 'assinatura');
+
+-- ================================================
+-- SOLICITAÇÕES DE EXCLUSÃO (LGPD)
+-- ================================================
+CREATE TABLE solicitacoes_exclusao (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_solicitante_id INT NOT NULL,
+    usuario_alvo_id INT NOT NULL,
+    motivo ENUM('inatividade','mudanca_empresa','solicitacao_titular','violacao_politica','outros') NOT NULL,
+    motivo_detalhado TEXT,
+    status ENUM('pendente','aprovada','rejeitada','processada') DEFAULT 'pendente',
+    justificativa_resposta TEXT,
+    processada_por INT,
+    data_processamento DATETIME,
+    empresa_id INT NOT NULL,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_solicitante_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_alvo_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (processada_por) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+);
+
+-- Índices para performance das solicitações de exclusão
+CREATE INDEX idx_solicitacoes_exclusao_solicitante ON solicitacoes_exclusao(usuario_solicitante_id);
+CREATE INDEX idx_solicitacoes_exclusao_alvo ON solicitacoes_exclusao(usuario_alvo_id);
+CREATE INDEX idx_solicitacoes_exclusao_status ON solicitacoes_exclusao(status);
+CREATE INDEX idx_solicitacoes_exclusao_empresa ON solicitacoes_exclusao(empresa_id);
 
 -- ================================================
 -- COMENTÁRIOS FINAIS

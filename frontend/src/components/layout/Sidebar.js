@@ -17,7 +17,8 @@ import {
   MessageCircle,
   User,
   Briefcase,
-  Bell
+  Bell,
+  UserX
 } from 'lucide-react';
 
 const SidebarContainer = styled.aside.withConfig({
@@ -224,6 +225,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
             { path: '/planos', icon: Gem, label: 'Planos' },
             { path: '/usuarios', icon: Users, label: 'Usuários' },
             { path: '/profissoes', icon: Briefcase, label: 'Profissões' },
+            { path: '/solicitacoes', icon: UserX, label: 'Solicitações' },
             { path: '/notificacoes', icon: Bell, label: 'Notificações' },
             { path: '/configuracoes', icon: Settings, label: 'Configurações' },
           ]
@@ -233,6 +235,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
           items: [
             { path: '/documentos', icon: FileText, label: 'Documentos' },
             { path: '/assinaturas', icon: PenTool, label: 'Assinaturas' },
+            { path: '/tipos-documentos', icon: ClipboardList, label: 'Classificação de Documentos' },
           ]
         },
         {
@@ -259,6 +262,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
           items: [
             { path: '/filiais', icon: Store, label: 'Filiais' },
             { path: '/usuarios', icon: Users, label: 'Usuários' },
+            { path: '/solicitacoes', icon: UserX, label: 'Solicitações' },
             { path: '/notificacoes', icon: Bell, label: 'Notificações' },
             { path: '/whatsapp', icon: MessageCircle, label: 'WhatsApp' },
           ]
@@ -268,6 +272,7 @@ function Sidebar({ collapsed, mobileOpen, onClose }) {
           items: [
             { path: '/documentos', icon: FileText, label: 'Documentos' },
             { path: '/assinaturas', icon: PenTool, label: 'Assinaturas' },
+            { path: '/tipos-documentos', icon: ClipboardList, label: 'Classificação de Documentos' },
           ]
         },
         {

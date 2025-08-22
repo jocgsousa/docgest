@@ -14,8 +14,8 @@ class Document {
         // Gerar hash único para o documento
         $hash_acesso = hash('sha256', uniqid() . microtime(true) . random_bytes(16));
         
-        $sql = "INSERT INTO {$this->table} (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, criado_por, empresa_id, filial_id, hash_acesso) 
-                VALUES (:titulo, :descricao, :nome_arquivo, :caminho_arquivo, :tamanho_arquivo, :tipo_arquivo, :status, :criado_por, :empresa_id, :filial_id, :hash_acesso)";
+        $sql = "INSERT INTO {$this->table} (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, tipo_documento_id, prazo_assinatura, competencia, validade_legal, criado_por, empresa_id, filial_id, hash_acesso) 
+                VALUES (:titulo, :descricao, :nome_arquivo, :caminho_arquivo, :tamanho_arquivo, :tipo_arquivo, :status, :tipo_documento_id, :prazo_assinatura, :competencia, :validade_legal, :criado_por, :empresa_id, :filial_id, :hash_acesso)";
         
         $stmt = $this->db->prepare($sql);
         
@@ -26,6 +26,10 @@ class Document {
         $stmt->bindParam(':tamanho_arquivo', $data['tamanho_arquivo']);
         $stmt->bindParam(':tipo_arquivo', $data['tipo_arquivo']);
         $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':tipo_documento_id', $data['tipo_documento_id']);
+        $stmt->bindParam(':prazo_assinatura', $data['prazo_assinatura']);
+        $stmt->bindParam(':competencia', $data['competencia']);
+        $stmt->bindParam(':validade_legal', $data['validade_legal']);
         $stmt->bindParam(':criado_por', $data['criado_por']);
         $stmt->bindParam(':empresa_id', $data['empresa_id']);
         $stmt->bindParam(':filial_id', $data['filial_id']);
@@ -39,11 +43,12 @@ class Document {
     }
     
     public function findByHash($hash) {
-        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome 
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome, td.nome as tipo_documento_nome 
                 FROM {$this->table} d 
                 LEFT JOIN usuarios u ON d.criado_por = u.id 
                 LEFT JOIN empresas e ON d.empresa_id = e.id 
                 LEFT JOIN filiais f ON d.filial_id = f.id 
+                LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id 
                 WHERE d.hash_acesso = :hash AND d.ativo = 1";
         
         $stmt = $this->db->prepare($sql);
@@ -70,11 +75,12 @@ class Document {
     }
     
     public function findById($id) {
-        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome 
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome, td.nome as tipo_documento_nome 
                 FROM {$this->table} d 
                 LEFT JOIN usuarios u ON d.criado_por = u.id 
                 LEFT JOIN empresas e ON d.empresa_id = e.id 
                 LEFT JOIN filiais f ON d.filial_id = f.id 
+                LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id 
                 WHERE d.id = :id AND d.ativo = 1";
         
         $stmt = $this->db->prepare($sql);
@@ -129,6 +135,22 @@ class Document {
             $params[':criado_por'] = $filters['criado_por'];
         }
         
+        if (!empty($filters['tipo_documento_id'])) {
+            $conditions[] = 'd.tipo_documento_id = :tipo_documento_id';
+            $params[':tipo_documento_id'] = $filters['tipo_documento_id'];
+        }
+        
+        if (!empty($filters['validade_inicio']) && !empty($filters['validade_fim'])) {
+            $conditions[] = 'd.prazo_assinatura BETWEEN :validade_inicio AND :validade_fim';
+            $params[':validade_inicio'] = $filters['validade_inicio'];
+            $params[':validade_fim'] = $filters['validade_fim'];
+        }
+        
+        if (!empty($filters['competencia'])) {
+            $conditions[] = 'DATE_FORMAT(d.competencia, "%Y-%m") = :competencia';
+            $params[':competencia'] = $filters['competencia'];
+        }
+        
         $whereClause = implode(' AND ', $conditions);
         
         // Count total
@@ -142,10 +164,11 @@ class Document {
         
         // Get data
         $offset = ($page - 1) * $pageSize;
-        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome 
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, td.nome as tipo_documento_nome 
                 FROM {$this->table} d 
                 LEFT JOIN usuarios u ON d.criado_por = u.id 
                 LEFT JOIN empresas e ON d.empresa_id = e.id 
+                LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id 
                 WHERE {$whereClause} 
                 ORDER BY d.data_criacao DESC 
                 LIMIT :limit OFFSET :offset";
@@ -171,7 +194,7 @@ class Document {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'empresa_id', 'filial_id', 'hash_acesso'];
+        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'tipo_documento_id', 'prazo_assinatura', 'competencia', 'validade_legal', 'empresa_id', 'filial_id', 'hash_acesso'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
@@ -454,5 +477,20 @@ class Document {
         $stmt->execute();
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getDocumentTypes() {
+        $sql = "SELECT * FROM tipos_documentos WHERE ativo = 1 ORDER BY nome ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getDocumentTypeById($id) {
+        $sql = "SELECT * FROM tipos_documentos WHERE id = :id AND ativo = 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }

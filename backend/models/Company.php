@@ -269,6 +269,19 @@ class Company {
     }
     
     /**
+     * Busca empresa pelo código
+     */
+    public function findByCode($codigo) {
+        $sql = "SELECT * FROM empresas WHERE codigo_empresa = :codigo AND ativo = 1";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':codigo', $codigo);
+        $stmt->execute();
+        
+        return $stmt->fetch();
+    }
+    
+    /**
      * Busca empresas com vencimento próximo
      */
     public function findExpiringCompanies($days = 7) {

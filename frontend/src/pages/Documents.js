@@ -234,7 +234,11 @@ const Documents = ({ openCreateModal = false }) => {
     empresa_id: '', 
     filial_id: '', 
     assinantes: [],
-    status: 'rascunho'
+    status: 'rascunho',
+    tipo_documento_id: '',
+    prazo_assinatura: '',
+    competencia: '',
+    validade_legal: ''
   });
   const [filters, setFilters] = useState({
     search: '',
@@ -261,6 +265,7 @@ const Documents = ({ openCreateModal = false }) => {
   const [viewingDocument, setViewingDocument] = useState(null);
   const [documentContent, setDocumentContent] = useState(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  const [documentTypes, setDocumentTypes] = useState([]);
 
   const statusOptions = [
     { value: '', label: 'Todos os status' },
@@ -353,6 +358,7 @@ const Documents = ({ openCreateModal = false }) => {
   useEffect(() => {
     loadCompanies();
     loadUploadConfig();
+    loadDocumentTypes();
   }, []);
 
   const loadUploadConfig = async () => {
@@ -450,6 +456,19 @@ const Documents = ({ openCreateModal = false }) => {
     }
   };
 
+  // Carregar tipos de documentos
+  const loadDocumentTypes = async () => {
+    try {
+      const response = await api.get('/document-types');
+      if (response.data.success) {
+        setDocumentTypes(Array.isArray(response.data.data.data) ? response.data.data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar tipos de documentos:', error);
+      setDocumentTypes([]);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       const response = await api.get('/documents/stats');
@@ -482,6 +501,15 @@ const Documents = ({ openCreateModal = false }) => {
       }
       if (formData.status) {
         submitData.append('status', formData.status);
+      }
+      if (formData.tipo_documento_id) {
+        submitData.append('tipo_documento_id', formData.tipo_documento_id);
+      }
+      if (formData.prazo_assinatura) {
+        submitData.append('prazo_assinatura', formData.prazo_assinatura);
+      }
+      if (formData.competencia) {
+        submitData.append('competencia', formData.competencia);
       }
 
       if (editingDocument) {
@@ -545,7 +573,11 @@ const Documents = ({ openCreateModal = false }) => {
         empresa_id: fullDocument.empresa_id || '',
         filial_id: fullDocument.filial_id || '',
         assinantes: assinantesIds,
-        status: fullDocument.status || 'rascunho'
+        status: fullDocument.status || 'rascunho',
+        tipo_documento_id: fullDocument.tipo_documento_id || '',
+        prazo_assinatura: fullDocument.prazo_assinatura || '',
+        competencia: fullDocument.competencia || '',
+        validade_legal: fullDocument.validade_legal || ''
       });
       
       setShowModal(true);
@@ -742,7 +774,11 @@ const Documents = ({ openCreateModal = false }) => {
       empresa_id: '', 
       filial_id: '', 
       assinantes: [],
-      status: 'rascunho'
+      status: 'rascunho',
+      tipo_documento_id: '',
+      prazo_assinatura: '',
+      competencia: '',
+      validade_legal: ''
     });
     setErrors({});
   };
@@ -1015,6 +1051,85 @@ const Documents = ({ openCreateModal = false }) => {
             </div>
           </FormGrid>
 
+          <FormGrid>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Classificação
+              </label>
+              <select
+                value={formData.tipo_documento_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, tipo_documento_id: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="">Selecione um tipo</option>
+                {Array.isArray(documentTypes) && documentTypes.map(type => (
+                  <option key={type.id} value={type.id}>
+                    {type.nome}
+                  </option>
+                ))}
+              </select>
+              {errors.tipo_documento_id && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.tipo_documento_id[0]}
+                </span>
+              )}
+            </div>
+          </FormGrid>
+
+          <FormGrid>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Competência
+              </label>
+              <input
+                type="month"
+                value={formData.competencia}
+                onChange={(e) => setFormData(prev => ({ ...prev, competencia: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+              {errors.competencia && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.competencia[0]}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Validade Legal
+              </label>
+              <input
+                type="date"
+                value={formData.validade_legal}
+                onChange={(e) => setFormData(prev => ({ ...prev, validade_legal: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              />
+              {errors.validade_legal && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.validade_legal[0]}
+                </span>
+              )}
+            </div>
+          </FormGrid>
+
           <FormRow>
             <div>
               <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
@@ -1074,6 +1189,35 @@ const Documents = ({ openCreateModal = false }) => {
                 </span>
               )}
             </div>
+
+
+
+              {/* Campo Prazo de Assinatura - só aparece quando há assinantes */}
+            {formData.assinantes && formData.assinantes.length > 0 && (
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Prazo para Assinatura
+                </label>
+                <input
+                  type="date"
+                  value={formData.prazo_assinatura}
+                  onChange={(e) => setFormData(prev => ({ ...prev, prazo_assinatura: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                {errors.prazo_assinatura && (
+                  <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                    {errors.prazo_assinatura[0]}
+                  </span>
+                )}
+              </div>
+            )}
+
           </FormRow>
 
           {/* Campo de Status - apenas para Admin e Super Admin */}

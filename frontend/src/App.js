@@ -4,6 +4,7 @@ import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Documents from './pages/Documents';
+import DocumentTypes from './pages/DocumentTypes';
 import Users from './pages/Users';
 import Companies from './pages/Companies';
 import Professions from './pages/Professions';
@@ -17,6 +18,7 @@ import WhatsApp from './pages/WhatsApp';
 import Profile from './pages/Profile';
 import Usage from './pages/Usage';
 import Notifications from './pages/Notifications';
+import Solicitacoes from './pages/Solicitacoes';
 
 // Landing Page e páginas públicas
 import LandingPage from './pages/LandingPage';
@@ -204,6 +206,16 @@ function App() {
                 } 
               />
               <Route 
+                path="/tipos-documentos" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <DocumentTypes />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/usuarios" 
                 element={
                   <ProtectedRoute>
@@ -339,6 +351,13 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Notifications />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/solicitacoes" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Solicitacoes />
                 </Layout>
               </ProtectedRoute>
             } />

@@ -53,8 +53,25 @@ class User {
      * Lista usuários com filtros
      */
     public function list($filters = [], $page = 1, $pageSize = 20) {
-        $where = ['u.ativo = 1'];
+        // Por padrão, mostrar apenas usuários ativos
+        // Mas se incluir_inativos for true, mostrar todos
+        if (isset($filters['incluir_inativos']) && $filters['incluir_inativos']) {
+            $where = ['1=1']; // Mostrar todos os usuários
+        } else {
+            $where = ['u.ativo = 1']; // Apenas usuários ativos
+        }
+        
+        // Se status específico for fornecido, usar ele
+        if (isset($filters['status'])) {
+            $where = ['u.ativo = :status'];
+        }
+        
         $params = [];
+        
+        // Adicionar filtro de status se especificado
+        if (isset($filters['status'])) {
+            $params[':status'] = $filters['status'];
+        }
         
         // Filtros
         if (!empty($filters['empresa_id'])) {
@@ -188,7 +205,7 @@ class User {
     /**
      * Desativa um usuário (soft delete)
      */
-    public function delete($id) {
+    public function softDelete($id) {
         $sql = "UPDATE {$this->table} SET ativo = 0, data_atualizacao = NOW() WHERE id = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->bindParam(':id', $id);
@@ -376,6 +393,83 @@ class User {
         $stmt->execute();
         
         return $stmt->fetchColumn();
+    }
+    
+    /**
+     * Busca usuário por ID incluindo inativos
+     */
+    public function findByIdIncludingInactive($id) {
+        $sql = "SELECT u.*, e.nome as empresa_nome, e.cnpj as empresa_cnpj, e.codigo_empresa,
+                       f.nome as filial_nome, p.nome as plano_nome
+                FROM {$this->table} u
+                LEFT JOIN empresas e ON u.empresa_id = e.id
+                LEFT JOIN filiais f ON u.filial_id = f.id
+                LEFT JOIN planos p ON e.plano_id = p.id
+                WHERE u.id = :id";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+        
+        return $stmt->fetch();
+    }
+    
+    /**
+     * Desativa um usuário (soft delete)
+     */
+    public function deactivate($id) {
+        try {
+            $sql = "UPDATE {$this->table} SET ativo = 0, data_atualizacao = NOW() WHERE id = :id";
+            
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':id', $id);
+            
+            $result = $stmt->execute();
+            
+            if (!$result) {
+                error_log("Erro SQL na desativação: " . implode(', ', $stmt->errorInfo()));
+            }
+            
+            return $result;
+        } catch (Exception $e) {
+            error_log("Exceção na desativação do usuário: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Ativa um usuário desativado
+     */
+    public function activate($id) {
+        try {
+            $sql = "UPDATE {$this->table} SET ativo = 1, data_atualizacao = NOW() WHERE id = :id";
+            
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':id', $id);
+            
+            $result = $stmt->execute();
+            
+            if (!$result) {
+                error_log("Erro SQL na ativação: " . implode(', ', $stmt->errorInfo()));
+            }
+            
+            return $result;
+        } catch (Exception $e) {
+            error_log("Exceção na ativação do usuário: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Exclui definitivamente um usuário (hard delete)
+     */
+    public function delete($id) {
+        $sql = "DELETE FROM {$this->table} WHERE id = :id";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':id', $id);
+        
+        return $stmt->execute();
     }
 }
 

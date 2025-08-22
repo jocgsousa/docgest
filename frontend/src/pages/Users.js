@@ -74,6 +74,16 @@ const StatusBadge = styled.span`
           background-color: #d1fae5;
           color: #059669;
         `;
+      case 'active':
+        return `
+          background-color: #d1fae5;
+          color: #059669;
+        `;
+      case 'inactive':
+        return `
+          background-color: #fee2e2;
+          color: #dc2626;
+        `;
       default:
         return `
           background-color: #f3f4f6;
@@ -106,7 +116,8 @@ const Users = ({ openCreateModal = false }) => {
   const [filters, setFilters] = useState({
     search: '',
     tipo_usuario: '',
-    empresa_id: ''
+    empresa_id: '',
+    status: '1' // Por padrão, mostrar apenas usuários ativos
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -115,11 +126,31 @@ const Users = ({ openCreateModal = false }) => {
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [showDeletionModal, setShowDeletionModal] = useState(false);
+  const [deletionUser, setDeletionUser] = useState(null);
+  const [deletionData, setDeletionData] = useState({
+    motivo: '',
+    detalhes: ''
+  });
 
   const userTypes = {
     1: 'Super Admin',
     2: 'Admin Empresa',
     3: 'Assinante'
+  };
+
+  const statusTypes = {
+    '1': 'Ativo',
+    '0': 'Inativo'
+  };
+
+  const deletionReasons = {
+    'dados_incorretos': 'Dados incorretos ou desatualizados',
+    'nao_utiliza_mais': 'Não utiliza mais o sistema',
+    'duplicacao': 'Conta duplicada',
+    'violacao_termos': 'Violação dos termos de uso',
+    'solicitacao_usuario': 'Solicitação do próprio usuário (LGPD)',
+    'outro': 'Outro motivo'
   };
 
   const columns = [
@@ -156,6 +187,15 @@ const Users = ({ openCreateModal = false }) => {
       title: 'Empresa'
     },
     {
+      key: 'ativo',
+      title: 'Status',
+      render: (value) => (
+        <StatusBadge status={value ? 'active' : 'inactive'}>
+          {value ? 'Ativo' : 'Inativo'}
+        </StatusBadge>
+      )
+    },
+    {
       key: 'actions',
       title: 'Ações',
       render: (_, row) => (
@@ -167,13 +207,41 @@ const Users = ({ openCreateModal = false }) => {
           >
             Editar
           </Button>
-          <Button
-            size="sm"
-            $variant="danger"
-            onClick={() => handleDelete(row.id)}
-          >
-            Excluir
-          </Button>
+          {row.ativo ? (
+            <Button
+              size="sm"
+              $variant="warning"
+              onClick={() => handleDeactivate(row.id)}
+            >
+              Desativar
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              $variant="success"
+              onClick={() => handleActivate(row.id)}
+            >
+              Ativar
+            </Button>
+          )}
+          {user?.tipo_usuario === 1 && (
+            <Button
+              size="sm"
+              $variant="danger"
+              onClick={() => handlePermanentDelete(row.id)}
+            >
+              Excluir Definitivo
+            </Button>
+          )}
+          {user?.tipo_usuario === 2 && (
+            <Button
+              size="sm"
+              $variant="warning"
+              onClick={() => handleRequestDeletion(row)}
+            >
+              Solicitar Exclusão
+            </Button>
+          )}
         </div>
       )
     }
@@ -217,6 +285,11 @@ const Users = ({ openCreateModal = false }) => {
         page_size: pagination.pageSize,
         ...filters
       });
+      
+      // Super admin e admin de empresa podem ver usuários inativos
+      if ((user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && filters.status === '0') {
+        params.append('incluir_inativos', 'true');
+      }
       
       const response = await api.get(`/users?${params}`);
       setUsers(response.data.data?.items || []);
@@ -274,13 +347,74 @@ const Users = ({ openCreateModal = false }) => {
     setShowModal(true);
   };
 
-  const handleDelete = async (userId) => {
-    if (window.confirm('Tem certeza que deseja excluir este usuário?')) {
+  const handleDeactivate = async (id) => {
+    if (window.confirm('Tem certeza que deseja desativar este usuário?')) {
       try {
-        await api.delete(`/users/${userId}`);
+        await api.put(`/users/${id}?action=deactivate`);
         fetchUsers();
       } catch (error) {
-        console.error('Erro ao excluir usuário:', error);
+        console.error('Erro ao desativar usuário:', error);
+        alert('Erro ao desativar usuário. Tente novamente.');
+      }
+    }
+  };
+
+  const handleActivate = async (id) => {
+    if (window.confirm('Tem certeza que deseja ativar este usuário?')) {
+      try {
+        await api.put(`/users/${id}?action=activate`);
+        fetchUsers();
+      } catch (error) {
+        console.error('Erro ao ativar usuário:', error);
+        alert('Erro ao ativar usuário. Tente novamente.');
+      }
+    }
+  };
+
+  const handleRequestDeletion = (user) => {
+    setDeletionUser(user);
+    setDeletionData({ motivo: '', detalhes: '' });
+    setShowDeletionModal(true);
+  };
+
+  const handleSubmitDeletion = async (e) => {
+    e.preventDefault();
+    if (!deletionData.motivo) {
+      alert('Por favor, selecione um motivo para a solicitação.');
+      return;
+    }
+    if (deletionData.motivo === 'outro' && !deletionData.detalhes.trim()) {
+      alert('Por favor, especifique o motivo da solicitação.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await api.post('/users/request-deletion', {
+        usuario_id: deletionUser.id,
+        motivo: deletionData.motivo,
+        detalhes: deletionData.detalhes
+      });
+      alert('Solicitação de exclusão enviada com sucesso!');
+      setShowDeletionModal(false);
+      setDeletionUser(null);
+      setDeletionData({ motivo: '', detalhes: '' });
+    } catch (error) {
+      console.error('Erro ao enviar solicitação:', error);
+      alert('Erro ao enviar solicitação. Tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePermanentDelete = async (id) => {
+    if (window.confirm('ATENÇÃO: Esta ação irá excluir permanentemente o usuário e todos os seus dados. Esta ação não pode ser desfeita. Tem certeza que deseja continuar?')) {
+      try {
+        await api.delete(`/users/${id}/permanent`);
+        fetchUsers();
+      } catch (error) {
+        console.error('Erro ao excluir usuário permanentemente:', error);
+        alert('Erro ao excluir usuário. Tente novamente.');
       }
     }
   };
@@ -390,6 +524,22 @@ const Users = ({ openCreateModal = false }) => {
                 {company.nome}
               </option>
             ))}
+          </select>
+        )}
+
+        {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
+          <select
+            value={filters.status}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '14px'
+            }}
+          >
+            <option value="1">Usuários Ativos</option>
+            <option value="0">Usuários Inativos</option>
           </select>
         )}
       </FiltersContainer>
@@ -602,6 +752,122 @@ const Users = ({ openCreateModal = false }) => {
             </Button>
             <Button type="submit" loading={submitting}>
               {editingUser ? 'Atualizar' : 'Criar'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={showDeletionModal}
+        onClose={() => {
+          setShowDeletionModal(false);
+          setDeletionUser(null);
+          setDeletionData({ motivo: '', detalhes: '' });
+        }}
+        title="Solicitar Exclusão de Usuário"
+      >
+        <form onSubmit={handleSubmitDeletion}>
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ marginBottom: '16px', color: '#6b7280' }}>
+              Você está solicitando a exclusão do usuário: <strong>{deletionUser?.nome}</strong>
+            </p>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Motivo da solicitação *
+              </label>
+              <select
+                value={deletionData.motivo}
+                onChange={(e) => setDeletionData(prev => ({ ...prev, motivo: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                required
+              >
+                <option value="">Selecione um motivo</option>
+                {Object.entries(deletionReasons).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {deletionData.motivo === 'outro' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Especifique o motivo *
+                </label>
+                <textarea
+                  value={deletionData.detalhes}
+                  onChange={(e) => setDeletionData(prev => ({ ...prev, detalhes: e.target.value }))}
+                  placeholder="Descreva o motivo da solicitação de exclusão..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                  required
+                />
+              </div>
+            )}
+
+            {deletionData.motivo && deletionData.motivo !== 'outro' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Detalhes adicionais (opcional)
+                </label>
+                <textarea
+                  value={deletionData.detalhes}
+                  onChange={(e) => setDeletionData(prev => ({ ...prev, detalhes: e.target.value }))}
+                  placeholder="Informações adicionais sobre a solicitação..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            )}
+
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: '#fef3c7', 
+              border: '1px solid #f59e0b', 
+              borderRadius: '6px',
+              marginBottom: '16px'
+            }}>
+              <p style={{ margin: 0, fontSize: '14px', color: '#92400e' }}>
+                <strong>Atenção:</strong> Esta solicitação será enviada aos administradores do sistema para análise. 
+                O usuário não será excluído automaticamente.
+              </p>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <Button
+              type="button"
+              $variant="outline"
+              onClick={() => {
+                setShowDeletionModal(false);
+                setDeletionUser(null);
+                setDeletionData({ motivo: '', detalhes: '' });
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" loading={submitting} $variant="warning">
+              Enviar Solicitação
             </Button>
           </div>
         </form>
