@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -70,6 +71,7 @@ const StatusBadge = styled.span`
 function Branches({ openCreateModal = false }) {
   const { user } = useAuth();
   const { refreshAll } = useData();
+  const { showSuccess, showError } = useToast();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(openCreateModal);
@@ -202,8 +204,10 @@ function Branches({ openCreateModal = false }) {
     try {
       if (editingBranch) {
         await api.put(`/branches/${editingBranch.id}`, formData);
+        showSuccess('Filial atualizada com sucesso!');
       } else {
         await api.post('/branches', formData);
+        showSuccess('Filial criada com sucesso!');
       }
       
       setShowModal(false);
@@ -228,7 +232,9 @@ function Branches({ openCreateModal = false }) {
       if (error.response?.data?.errors) {
         setErrors(formatErrors(error.response.data.errors));
       } else {
-        setError(error.response?.data?.message || 'Erro ao salvar filial');
+        const errorMessage = error.response?.data?.message || 'Erro ao salvar filial';
+        setError(errorMessage);
+        showError(errorMessage);
       }
     } finally {
       setSubmitting(false);
@@ -264,9 +270,12 @@ function Branches({ openCreateModal = false }) {
 
     try {
       await api.delete(`/branches/${id}`);
+      showSuccess('Filial excluída com sucesso!');
       fetchBranches();
     } catch (error) {
-      setError(error.response?.data?.message || 'Erro ao excluir filial');
+      const errorMessage = error.response?.data?.message || 'Erro ao excluir filial';
+      setError(errorMessage);
+      showError(errorMessage);
     } finally {
       // Atualizar dados do contexto
       refreshAll();

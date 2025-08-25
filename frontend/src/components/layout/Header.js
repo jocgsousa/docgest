@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
+import { useToast } from '../../contexts/ToastContext';
 import Button from '../common/Button';
 import NotificationDetail from '../NotificationDetail';
 import api from '../../services/api';
@@ -360,6 +361,7 @@ function Header({
 }) {
   const { user, logout } = useAuth();
   const { appInfo } = useApp();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   
   // Debug log para verificar appInfo no Header
@@ -418,6 +420,7 @@ function Header({
       setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
     } catch (error) {
       console.error('Erro ao carregar notificações:', error);
+      showError('Erro ao carregar notificações');
       setNotifications([]); // Garantir que sempre seja um array em caso de erro
     } finally {
       setLoading(false);
@@ -465,8 +468,10 @@ function Header({
         prev.map(n => ({ ...n, lida: 1 }))
       );
       setUnreadCount(0);
+      showSuccess('Todas as notificações foram marcadas como lidas');
     } catch (error) {
       console.error('Erro ao marcar todas como lidas:', error);
+      showError('Erro ao marcar notificações como lidas');
     }
   };
 
@@ -488,8 +493,11 @@ function Header({
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
       
+      showSuccess('Notificação excluída com sucesso');
+      
     } catch (error) {
       console.error('Erro ao excluir notificação:', error);
+      showError('Erro ao excluir notificação');
     }
   };
 

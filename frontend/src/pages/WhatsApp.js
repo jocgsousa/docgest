@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -106,6 +107,7 @@ const PreviewContent = styled.div`
 
 function WhatsApp() {
   const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [config, setConfig] = useState({
     webhook_url: '',
     api_token: '',
@@ -163,9 +165,12 @@ function WhatsApp() {
     try {
       await api.put('/whatsapp/config', config);
       setSuccess('Configuração salva com sucesso!');
+      showSuccess('Configuração salva com sucesso!');
       checkConnection();
     } catch (error) {
-      setError(error.response?.data?.message || 'Erro ao salvar configuração');
+      const errorMessage = error.response?.data?.message || 'Erro ao salvar configuração';
+      setError(errorMessage);
+      showError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -173,7 +178,7 @@ function WhatsApp() {
 
   const handleTest = async () => {
     if (!testPhone || !testMessage) {
-      setError('Preencha o telefone e a mensagem para teste');
+      showError('Preencha o telefone e a mensagem para teste');
       return;
     }
 
@@ -187,11 +192,14 @@ function WhatsApp() {
         message: testMessage
       });
       setSuccess('Mensagem de teste enviada com sucesso!');
+      showSuccess('Mensagem de teste enviada com sucesso!');
       setShowTestModal(false);
       setTestPhone('');
       setTestMessage('');
     } catch (error) {
-      setError(error.response?.data?.message || 'Erro ao enviar mensagem de teste');
+      const errorMessage = error.response?.data?.message || 'Erro ao enviar mensagem de teste';
+      setError(errorMessage);
+      showError(errorMessage);
     } finally {
       setTesting(false);
     }

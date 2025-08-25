@@ -816,11 +816,16 @@ class UserController {
                     ua.email as usuario_alvo_email,
                     us.nome as usuario_solicitante_nome,
                     us.email as usuario_solicitante_email,
-                    e.nome as empresa_nome
+                    e.nome as empresa_nome,
+                    h.dados_usuario as historico_usuario,
+                    h.acao_realizada as historico_acao,
+                    h.observacoes as historico_observacoes,
+                    h.data_criacao as historico_data
                 FROM solicitacoes s
                 LEFT JOIN usuarios ua ON s.usuario_alvo_id = ua.id
                 LEFT JOIN usuarios us ON s.usuario_solicitante_id = us.id
                 LEFT JOIN empresas e ON s.empresa_id = e.id
+                LEFT JOIN historico_solicitacoes h ON s.id = h.solicitacao_id
                 {$whereClause}
                 ORDER BY s.data_criacao DESC
                 LIMIT :limit OFFSET :offset
@@ -838,6 +843,16 @@ class UserController {
             
             $stmt->execute();
             $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Processar dados do histórico
+            foreach ($requests as &$request) {
+                if (!empty($request['historico_usuario'])) {
+                    $request['historico_usuario'] = json_decode($request['historico_usuario'], true);
+                } else {
+                    $request['historico_usuario'] = null;
+                }
+            }
+            unset($request); // Limpar referência
             
             // Contar total de registros
             $countSql = "
@@ -879,27 +894,49 @@ class UserController {
      */
     public function updateRequest() {
         try {
+            // Suprimir warnings para evitar interferência na resposta JSON
+            $oldErrorReporting = error_reporting(E_ERROR | E_PARSE);
+            
             $currentUser = JWT::requireSuperAdmin();
             
-            $input = json_decode(file_get_contents('php://input'), true);
+            $rawInput = file_get_contents('php://input');
+            $input = json_decode($rawInput, true);
             
-            if (!$input) {
-                Response::error('Dados inválidos', 400);
+            // Verificar se o JSON é válido
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Response::error('JSON inválido: ' . json_last_error_msg(), 400);
+                return;
+            }
+            
+            if (!$input || !is_array($input)) {
+                Response::error('Dados inválidos ou vazios', 400);
                 return;
             }
             
             // Validar campos obrigatórios
             $requiredFields = ['id', 'status'];
             foreach ($requiredFields as $field) {
-                if (!isset($input[$field]) || empty($input[$field])) {
-                    Response::error("Campo '$field' é obrigatório", 400);
+                if (!isset($input[$field]) || $input[$field] === '' || $input[$field] === null) {
+                    Response::error("Campo '$field' é obrigatório e não pode estar vazio", 400);
                     return;
                 }
             }
             
+            // Armazenar o ID da solicitação para uso posterior
+            $requestId = (int)$input['id'];
+            
+            // Validar se o ID é um número válido
+            if ($requestId <= 0) {
+                Response::error('ID da solicitação deve ser um número válido maior que zero', 400);
+                return;
+            }
+            
+            // Armazenar o status para uso posterior
+            $status = $input['status'];
+            
             // Validar status
             $validStatuses = ['pendente', 'aprovada', 'rejeitada', 'processada'];
-            if (!in_array($input['status'], $validStatuses)) {
+            if (!in_array($status, $validStatuses)) {
                 Response::error('Status inválido', 400);
                 return;
             }
@@ -907,23 +944,29 @@ class UserController {
             $database = new Database();
             $pdo = $database->getConnection();
             
-            // Verificar se a solicitação existe
-            $checkStmt = $pdo->prepare("SELECT * FROM solicitacoes WHERE id = ?");
-            $checkStmt->execute([$input['id']]);
+            // Verificar se a solicitação existe e está ativa
+            $checkStmt = $pdo->prepare("SELECT * FROM solicitacoes WHERE id = ? AND ativo = 1");
+            $checkStmt->execute([$requestId]);
             $request = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$request) {
-                Response::error('Solicitação não encontrada', 404);
+                Response::error('Solicitação não encontrada ou foi excluída', 404);
+                return;
+            }
+            
+            // Verificar se a solicitação ainda pode ser atualizada
+            if ($request['status'] === 'processada') {
+                Response::error('Esta solicitação já foi processada e não pode ser alterada', 400);
                 return;
             }
             
             // Preparar dados para atualização
             $updateData = [
-                'status' => $input['status'],
+                'status' => $status,
                 'data_processamento' => date('Y-m-d H:i:s')
             ];
             
-            if (isset($input['justificativa_resposta'])) {
+            if (isset($input['justificativa_resposta']) && !empty($input['justificativa_resposta'])) {
                 $updateData['justificativa_resposta'] = $input['justificativa_resposta'];
             }
             
@@ -941,38 +984,83 @@ class UserController {
             foreach ($updateData as $field => $value) {
                 $stmt->bindValue(":$field", $value);
             }
-            $stmt->bindValue(':id', $input['id'], PDO::PARAM_INT);
+            $stmt->bindValue(':id', $requestId, PDO::PARAM_INT);
             
             if ($stmt->execute()) {
                 // Se a solicitação foi aprovada, desativar o usuário
-                if ($input['status'] === 'aprovada') {
-                    $this->deactivateUserFromRequest($request['usuario_alvo_id']);
+                if ($status === 'aprovada') {
+                    $this->deactivateUserFromRequest($request['usuario_alvo_id'], $requestId);
                 }
                 
                 // Enviar notificação para o usuário que criou a solicitação
-                $this->sendRequestStatusNotification($request, $input['status'], $currentUser['id'], $input['justificativa_resposta'] ?? null);
+                $justificativa = isset($input['justificativa_resposta']) && !empty($input['justificativa_resposta']) ? $input['justificativa_resposta'] : null;
+                $this->sendRequestStatusNotification($request, $status, $currentUser['id'], $justificativa);
+                
+                // Limpar qualquer output anterior
+                if (ob_get_level()) {
+                    ob_clean();
+                }
                 
                 Response::success([
                     'message' => 'Solicitação atualizada com sucesso',
-                    'request_id' => $input['id']
+                    'request_id' => $requestId
                 ]);
             } else {
                 Response::error('Erro ao atualizar solicitação', 500);
             }
             
         } catch (Exception $e) {
+            // Restaurar error_reporting
+            if (isset($oldErrorReporting)) {
+                error_reporting($oldErrorReporting);
+            }
             Response::error('Erro ao atualizar solicitação: ' . $e->getMessage(), 500);
+        } finally {
+            // Restaurar error_reporting
+            if (isset($oldErrorReporting)) {
+                error_reporting($oldErrorReporting);
+            }
         }
     }
 
     /**
      * Desativa um usuário quando a solicitação é aprovada
      */
-    private function deactivateUserFromRequest($userId) {
+    private function deactivateUserFromRequest($userId, $solicitacaoId = null) {
         try {
             $database = new Database();
             $pdo = $database->getConnection();
             
+            // Buscar dados completos do usuário antes da desativação
+            $stmt = $pdo->prepare("
+                SELECT u.*, p.nome as profissao_nome, e.nome as empresa_nome, f.nome as filial_nome
+                FROM usuarios u
+                LEFT JOIN profissoes p ON u.profissao_id = p.id
+                LEFT JOIN empresas e ON u.empresa_id = e.id
+                LEFT JOIN filiais f ON u.filial_id = f.id
+                WHERE u.id = ?
+            ");
+            $stmt->execute([$userId]);
+            $userData = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($userData && $solicitacaoId) {
+                // Remover senha dos dados para segurança
+                unset($userData['senha']);
+                
+                // Salvar histórico antes da desativação
+                $stmtHistorico = $pdo->prepare("
+                    INSERT INTO historico_solicitacoes 
+                    (solicitacao_id, usuario_id, dados_usuario, acao_realizada, observacoes) 
+                    VALUES (?, ?, ?, 'desativacao', 'Usuário desativado devido à solicitação de exclusão')
+                ");
+                $stmtHistorico->execute([
+                    $solicitacaoId,
+                    $userId,
+                    json_encode($userData, JSON_UNESCAPED_UNICODE)
+                ]);
+            }
+            
+            // Desativar o usuário
             $stmt = $pdo->prepare("UPDATE usuarios SET ativo = 0 WHERE id = ?");
             $stmt->execute([$userId]);
             

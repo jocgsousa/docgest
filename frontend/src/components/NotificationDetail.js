@@ -147,7 +147,20 @@ const ReadIndicator = styled.div`
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: ${props => props.read ? '#10b981' : '#f59e0b'};
+  background-color: ${props => props.read ? '#10b981' : '#ef4444'};
+`;
+
+const Footer = styled.div`
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+`;
+
+const FooterText = styled.div`
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-style: italic;
 `;
 
 function NotificationDetail({ notification, onClose, onMarkAsRead }) {
@@ -218,6 +231,12 @@ function NotificationDetail({ notification, onClose, onMarkAsRead }) {
               }
             </span>
           </ReadStatus>
+          
+          <Footer>
+            <FooterText>
+              Registrada em: {formatDate(notification.data_criacao)}
+            </FooterText>
+          </Footer>
         </Content>
       </Modal>
     </Overlay>

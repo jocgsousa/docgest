@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
-import { toast } from 'react-toastify';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Table from '../components/Table';
@@ -19,7 +19,9 @@ import {
   Check,
   X,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  History,
+  User
 } from 'lucide-react';
 
 const PageContainer = styled.div`
@@ -93,8 +95,57 @@ const StatusBadge = styled.span`
   }}
 `;
 
+const HistorySection = styled.div`
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+`;
+
+const HistoryTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const HistoryContent = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+`;
+
+const HistoryItem = styled.div`
+  background-color: white;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+`;
+
+const HistoryLabel = styled.label`
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const HistoryValue = styled.p`
+  font-size: 14px;
+  color: #1e293b;
+  margin: 0;
+  word-break: break-word;
+`;
+
 const Solicitacoes = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -179,12 +230,12 @@ const Solicitacoes = () => {
         setPagination(response.data.data.pagination);
       } else {
         console.error('Erro na resposta da API:', response.data.message);
-        toast.error('Erro ao carregar solicitações');
+        showError('Erro ao carregar solicitações');
       }
     } catch (error) {
       console.error('Erro ao carregar solicitações:', error);
       console.error('Detalhes do erro:', error.response?.data);
-      toast.error('Erro ao carregar solicitações');
+      showError('Erro ao carregar solicitações');
     } finally {
       setLoading(false);
     }
@@ -237,15 +288,15 @@ const Solicitacoes = () => {
       });
 
       if (response.data.success) {
-        toast.success('Solicitação atualizada com sucesso!');
+        showSuccess('Solicitação atualizada com sucesso!');
         closeEditModal();
         fetchRequests(pagination.current_page);
       } else {
-        toast.error(response.data.message || 'Erro ao atualizar solicitação');
+        showError(response.data.message || 'Erro ao atualizar solicitação');
       }
     } catch (error) {
       console.error('Erro ao atualizar solicitação:', error);
-      toast.error('Erro ao atualizar solicitação');
+      showError('Erro ao atualizar solicitação');
     }
   };
 
@@ -254,6 +305,113 @@ const Solicitacoes = () => {
   const getMotiveLabel = (motivo) => {
     const option = motivoOptions.find(opt => opt.value === motivo);
     return option ? option.label : motivo;
+  };
+
+  const renderHistorySection = (request) => {
+    if (!request.historico_usuario || !request.historico_acao) {
+      return null;
+    }
+
+    const historicoData = request.historico_usuario;
+    
+    return (
+      <HistorySection>
+        <HistoryTitle>
+          <History size={16} />
+          Histórico do Usuário Afetado
+        </HistoryTitle>
+        
+        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#64748b' }}>
+          <strong>Ação realizada:</strong> {request.historico_acao === 'desativacao' ? 'Desativação de usuário' : request.historico_acao}
+          {request.historico_data && (
+            <span> em {formatDate(request.historico_data)}</span>
+          )}
+        </div>
+        
+        {request.historico_observacoes && (
+          <div style={{ marginBottom: '16px', fontSize: '14px', color: '#64748b', fontStyle: 'italic' }}>
+            <strong>Observações:</strong> {request.historico_observacoes}
+          </div>
+        )}
+        
+        <HistoryContent>
+          {historicoData.nome && (
+            <HistoryItem>
+              <HistoryLabel>Nome</HistoryLabel>
+              <HistoryValue>{historicoData.nome}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.email && (
+            <HistoryItem>
+              <HistoryLabel>Email</HistoryLabel>
+              <HistoryValue>{historicoData.email}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.cpf && (
+            <HistoryItem>
+              <HistoryLabel>CPF</HistoryLabel>
+              <HistoryValue>{historicoData.cpf}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.telefone && (
+            <HistoryItem>
+              <HistoryLabel>Telefone</HistoryLabel>
+              <HistoryValue>{historicoData.telefone}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.profissao_nome && (
+            <HistoryItem>
+              <HistoryLabel>Profissão</HistoryLabel>
+              <HistoryValue>{historicoData.profissao_nome}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.empresa_nome && (
+            <HistoryItem>
+              <HistoryLabel>Empresa</HistoryLabel>
+              <HistoryValue>{historicoData.empresa_nome}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.filial_nome && (
+            <HistoryItem>
+              <HistoryLabel>Filial</HistoryLabel>
+              <HistoryValue>{historicoData.filial_nome}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.tipo_usuario && (
+            <HistoryItem>
+              <HistoryLabel>Tipo de Usuário</HistoryLabel>
+              <HistoryValue>
+                {historicoData.tipo_usuario === 1 ? 'Super Admin' : 
+                 historicoData.tipo_usuario === 2 ? 'Admin da Empresa' : 
+                 historicoData.tipo_usuario === 3 ? 'Usuário Comum' : 
+                 `Tipo ${historicoData.tipo_usuario}`}
+              </HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.data_criacao && (
+            <HistoryItem>
+              <HistoryLabel>Data de Criação</HistoryLabel>
+              <HistoryValue>{formatDate(historicoData.data_criacao)}</HistoryValue>
+            </HistoryItem>
+          )}
+          
+          {historicoData.ativo !== undefined && (
+            <HistoryItem>
+              <HistoryLabel>Status da Conta</HistoryLabel>
+              <HistoryValue>{historicoData.ativo ? 'Ativa' : 'Inativa'}</HistoryValue>
+            </HistoryItem>
+          )}
+        </HistoryContent>
+      </HistorySection>
+    );
   };
 
   useEffect(() => {
@@ -494,6 +652,9 @@ const Solicitacoes = () => {
                   </p>
                 </div>
               )}
+            
+            {/* Seção de Histórico */}
+            {renderHistorySection(viewingRequest)}
             </div>
           )}
         </Modal>

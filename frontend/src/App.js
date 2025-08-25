@@ -31,6 +31,7 @@ import Layout from './components/layout/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
 import { AppProvider } from './contexts/AppContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 const theme = {
   colors: {
@@ -141,6 +142,7 @@ function App() {
       <AppProvider>
         <AuthProvider>
           <DataProvider>
+            <ToastProvider>
              <Router>
                <AppContainer>
                <Routes>
@@ -365,6 +367,7 @@ function App() {
               </Routes>
                </AppContainer>
              </Router>
+            </ToastProvider>
           </DataProvider>
         </AuthProvider>
       </AppProvider>

@@ -126,7 +126,7 @@ CREATE TABLE documentos (
     tamanho_arquivo BIGINT,
     tipo_arquivo VARCHAR(100),
     hash_acesso VARCHAR(64) UNIQUE NOT NULL,
-    status ENUM('rascunho','enviado','assinado','cancelado') DEFAULT 'rascunho',
+    status ENUM('rascunho','enviado','assinado','cancelado','arquivo') DEFAULT 'rascunho',
     tipo_documento_id INT,
     prazo_assinatura DATE COMMENT 'Data limite até quando o documento pode ser assinado',
     competencia DATE COMMENT 'Mês/ano de competência do documento (ex: folha de pagamento)',
@@ -512,6 +512,26 @@ CREATE INDEX idx_solicitacoes_status ON solicitacoes(status);
 CREATE INDEX idx_solicitacoes_empresa ON solicitacoes(empresa_id);
 CREATE INDEX idx_solicitacoes_tipo ON solicitacoes(tipo_solicitacao);
 CREATE INDEX idx_solicitacoes_motivo ON solicitacoes(motivo);
+
+-- ================================================
+-- HISTÓRICO DE SOLICITAÇÕES
+-- ================================================
+-- Tabela para armazenar dados históricos dos usuários afetados por solicitações
+CREATE TABLE historico_solicitacoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    solicitacao_id INT NOT NULL,
+    usuario_id INT NOT NULL COMMENT 'ID do usuário que foi afetado',
+    dados_usuario JSON NOT NULL COMMENT 'Dados completos do usuário antes da exclusão/alteração',
+    acao_realizada ENUM('exclusao','desativacao','alteracao') NOT NULL,
+    observacoes TEXT,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (solicitacao_id) REFERENCES solicitacoes(id) ON DELETE CASCADE
+);
+
+-- Índices para performance do histórico
+CREATE INDEX idx_historico_solicitacao ON historico_solicitacoes(solicitacao_id);
+CREATE INDEX idx_historico_usuario ON historico_solicitacoes(usuario_id);
+CREATE INDEX idx_historico_acao ON historico_solicitacoes(acao_realizada);
 
 -- ================================================
 -- TABELA DE TOKENS DE CADASTRO

@@ -65,6 +65,7 @@ const StatusBadge = styled.span`
       case 'enviado': return '#dbeafe';
       case 'assinado': return '#d1fae5';
       case 'cancelado': return '#fee2e2';
+      case 'arquivo': return '#f3e8ff';
       default: return '#f3f4f6';
     }
   }};
@@ -74,6 +75,7 @@ const StatusBadge = styled.span`
       case 'enviado': return '#1e40af';
       case 'assinado': return '#065f46';
       case 'cancelado': return '#dc2626';
+      case 'arquivo': return '#7c3aed';
       default: return '#374151';
     }
   }};
@@ -251,7 +253,8 @@ const Documents = ({ openCreateModal = false }) => {
     { value: 'rascunho', label: 'Rascunho' },
     { value: 'enviado', label: 'Enviado' },
     { value: 'assinado', label: 'Assinado' },
-    { value: 'cancelado', label: 'Cancelado' }
+    { value: 'cancelado', label: 'Cancelado' },
+    { value: 'arquivo', label: 'Arquivo' }
   ];
 
   const getStatusLabel = (status) => {
@@ -1217,6 +1220,7 @@ const Documents = ({ openCreateModal = false }) => {
                   <option value="enviado">Enviado</option>
                   <option value="assinado">Assinado</option>
                   <option value="cancelado">Cancelado</option>
+                  <option value="arquivo">Arquivo</option>
                 </select>
                 {errors.status && (
                   <span style={{ color: '#dc2626', fontSize: '12px' }}>

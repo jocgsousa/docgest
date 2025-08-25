@@ -5,6 +5,8 @@ import api from '../services/api';
 import Button from './Button';
 import Card from './Card';
 import Input from './Input';
+import Toast from './Toast';
+import useToast from '../hooks/useToast';
 import { Send, Users, User, Building2, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 
 const ManagerContainer = styled.div`
@@ -157,18 +159,60 @@ const ErrorMessage = styled.div`
   margin-top: 4px;
 `;
 
-const SuccessMessage = styled.div`
-  color: ${props => props.theme.colors.green};
+const AlertMessage = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 8px;
   font-size: 14px;
-  margin-top: 4px;
-  padding: 12px;
-  background-color: ${props => props.theme.colors.green}10;
-  border-radius: 6px;
-  border: 1px solid ${props => props.theme.colors.green}30;
+  font-weight: 500;
+  margin: 16px 0;
+  border: 1px solid;
+  
+  &.success {
+    background-color: ${props => props.theme.colors.green}10;
+    border-color: ${props => props.theme.colors.green}30;
+    color: ${props => props.theme.colors.green};
+  }
+  
+  &.error {
+    background-color: ${props => props.theme.colors.red}10;
+    border-color: ${props => props.theme.colors.red}30;
+    color: ${props => props.theme.colors.red};
+  }
+  
+  &.info {
+    background-color: ${props => props.theme.colors.blue}10;
+    border-color: ${props => props.theme.colors.blue}30;
+    color: ${props => props.theme.colors.blue};
+  }
+`;
+
+const AlertIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+`;
+
+const AlertContent = styled.div`
+  flex: 1;
+`;
+
+const AlertTitle = styled.div`
+  font-weight: 600;
+  margin-bottom: 4px;
+`;
+
+const AlertDescription = styled.div`
+  font-weight: 400;
+  opacity: 0.9;
 `;
 
 function NotificationManager() {
   const { user } = useAuth();
+  const { toasts, removeToast, showSuccess, showError, showInfo } = useToast();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
@@ -179,7 +223,7 @@ function NotificationManager() {
     usuario_destinatario_id: ''
   });
   const [errors, setErrors] = useState({});
-  const [success, setSuccess] = useState('');
+  const [feedback, setFeedback] = useState(null); // { type: 'success'|'error'|'info', title: '', message: '', details: '' }
 
   const isSuperAdmin = user?.tipo_usuario === 1;
   const isCompanyAdmin = user?.tipo_usuario === 2;
@@ -206,7 +250,7 @@ function NotificationManager() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-    setSuccess('');
+    setFeedback(null);
   };
 
   const validateForm = () => {
@@ -236,7 +280,7 @@ function NotificationManager() {
     }
 
     setLoading(true);
-    setSuccess('');
+    setFeedback(null);
 
     try {
       const payload = {
@@ -255,9 +299,44 @@ function NotificationManager() {
         payload.usuario_destinatario_id = formData.usuario_destinatario_id;
       }
 
-      await api.post('/notifications', payload);
+      const response = await api.post('/notifications', payload);
       
-      setSuccess('Notificação enviada com sucesso!');
+      // Preparar mensagem de sucesso detalhada
+      let successMessage = 'Notificação enviada com sucesso!';
+      let successDetails = '';
+      
+      if (response.data?.notifications_created) {
+        const count = response.data.notifications_created;
+        successDetails = `${count} notificação${count > 1 ? 'ões' : ''} ${count > 1 ? 'foram criadas' : 'foi criada'}.`;
+      }
+      
+      if (formData.recipient_type === 'all') {
+        if (isSuperAdmin) {
+          successDetails += ' Enviada para todos os usuários do sistema.';
+        } else {
+          successDetails += ' Enviada para todos os usuários da sua empresa.';
+        }
+      } else if (formData.recipient_type === 'specific') {
+        const selectedUser = getFilteredUsers().find(u => u.id == formData.usuario_destinatario_id);
+        if (selectedUser) {
+          successDetails += ` Enviada para ${selectedUser.nome} (${selectedUser.email}).`;
+        }
+      }
+      
+      setFeedback({
+        type: 'success',
+        title: 'Notificação Enviada!',
+        message: successMessage,
+        details: successDetails
+      });
+      
+      // Mostrar toast de sucesso
+      showSuccess(
+        'Notificação Enviada!',
+        successDetails || successMessage
+      );
+      
+      // Limpar formulário
       setFormData({
         titulo: '',
         mensagem: '',
@@ -268,7 +347,20 @@ function NotificationManager() {
       
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Erro ao enviar notificação';
-      setErrors({ submit: errorMessage });
+      const errorDetails = error.response?.data?.details || 'Verifique os dados e tente novamente.';
+      
+      setFeedback({
+        type: 'error',
+        title: 'Erro no Envio',
+        message: errorMessage,
+        details: errorDetails
+      });
+      
+      // Mostrar toast de erro
+      showError(
+        'Erro no Envio',
+        errorMessage
+      );
     } finally {
       setLoading(false);
     }
@@ -285,6 +377,40 @@ function NotificationManager() {
       default:
         return <Info size={16} />;
     }
+  };
+
+  const getFeedbackIcon = (type) => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle size={20} />;
+      case 'error':
+        return <AlertCircle size={20} />;
+      case 'info':
+        return <Info size={20} />;
+      default:
+        return <Info size={20} />;
+    }
+  };
+
+  const renderFeedback = () => {
+    if (!feedback) return null;
+
+    return (
+      <AlertMessage className={feedback.type}>
+        <AlertIcon>
+          {getFeedbackIcon(feedback.type)}
+        </AlertIcon>
+        <AlertContent>
+          <AlertTitle>{feedback.title}</AlertTitle>
+          <AlertDescription>
+            {feedback.message}
+            {feedback.details && (
+              <div style={{ marginTop: '4px' }}>{feedback.details}</div>
+            )}
+          </AlertDescription>
+        </AlertContent>
+      </AlertMessage>
+    );
   };
 
   const getRecipientOptions = () => {
@@ -331,12 +457,13 @@ function NotificationManager() {
   }
 
   return (
-    <ManagerContainer>
-      <NotificationForm>
-        <FormTitle>
-          <Send size={20} />
-          Enviar Notificação
-        </FormTitle>
+    <>
+      <ManagerContainer>
+        <NotificationForm>
+          <FormTitle>
+            <Send size={20} />
+            Enviar Notificação
+          </FormTitle>
         
         <form onSubmit={handleSubmit}>
           <FormGrid>
@@ -425,8 +552,7 @@ function NotificationManager() {
             )}
           </FormGrid>
 
-          {errors.submit && <ErrorMessage>{errors.submit}</ErrorMessage>}
-          {success && <SuccessMessage>{success}</SuccessMessage>}
+          {renderFeedback()}
 
           <ButtonGroup>
             <Button
@@ -441,7 +567,7 @@ function NotificationManager() {
                   usuario_destinatario_id: ''
                 });
                 setErrors({});
-                setSuccess('');
+                setFeedback(null);
               }}
               disabled={loading}
             >
@@ -460,6 +586,9 @@ function NotificationManager() {
         </form>
       </NotificationForm>
     </ManagerContainer>
+    
+    <Toast toasts={toasts} removeToast={removeToast} />
+  </>
   );
 }
 

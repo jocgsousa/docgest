@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
+import { useToast } from '../contexts/ToastContext';
 import api from '../services/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -97,6 +98,7 @@ const StatusBadge = styled.span`
 const Users = ({ openCreateModal = false }) => {
   const { user } = useAuth();
   const { companies, branches, loadCompanies, loadBranches } = useData();
+  const { showSuccess, showError } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -316,8 +318,10 @@ const Users = ({ openCreateModal = false }) => {
     try {
       if (editingUser) {
         await api.put(`/users/${editingUser.id}`, formData);
+        showSuccess('Usuário atualizado com sucesso!');
       } else {
         await api.post('/users', formData);
+        showSuccess('Usuário criado com sucesso!');
       }
       
       setShowModal(false);
@@ -327,6 +331,8 @@ const Users = ({ openCreateModal = false }) => {
     } catch (error) {
       if (error.response?.data?.errors) {
         setErrors(formatErrors(error.response.data.errors));
+      } else {
+        showError(error.response?.data?.message || 'Erro ao salvar usuário');
       }
     } finally {
       setSubmitting(false);
@@ -353,10 +359,11 @@ const Users = ({ openCreateModal = false }) => {
     if (window.confirm('Tem certeza que deseja desativar este usuário?')) {
       try {
         await api.put(`/users/${id}?action=deactivate`);
+        showSuccess('Usuário desativado com sucesso!');
         fetchUsers();
       } catch (error) {
         console.error('Erro ao desativar usuário:', error);
-        alert('Erro ao desativar usuário. Tente novamente.');
+        showError('Erro ao desativar usuário. Tente novamente.');
       }
     }
   };
@@ -365,10 +372,11 @@ const Users = ({ openCreateModal = false }) => {
     if (window.confirm('Tem certeza que deseja ativar este usuário?')) {
       try {
         await api.put(`/users/${id}?action=activate`);
+        showSuccess('Usuário ativado com sucesso!');
         fetchUsers();
       } catch (error) {
         console.error('Erro ao ativar usuário:', error);
-        alert('Erro ao ativar usuário. Tente novamente.');
+        showError('Erro ao ativar usuário. Tente novamente.');
       }
     }
   };
@@ -382,11 +390,11 @@ const Users = ({ openCreateModal = false }) => {
   const handleSubmitDeletion = async (e) => {
     e.preventDefault();
     if (!deletionData.motivo) {
-      alert('Por favor, selecione um motivo para a solicitação.');
+      showError('Por favor, selecione um motivo para a solicitação.');
       return;
     }
     if (deletionData.motivo === 'outro' && !deletionData.detalhes.trim()) {
-      alert('Por favor, especifique o motivo da solicitação.');
+      showError('Por favor, especifique o motivo da solicitação.');
       return;
     }
 
@@ -397,13 +405,13 @@ const Users = ({ openCreateModal = false }) => {
         motivo: deletionData.motivo,
         detalhes: deletionData.detalhes
       });
-      alert('Solicitação de exclusão enviada com sucesso!');
+      showSuccess('Solicitação de exclusão enviada com sucesso!');
       setShowDeletionModal(false);
       setDeletionUser(null);
       setDeletionData({ motivo: '', detalhes: '' });
     } catch (error) {
       console.error('Erro ao enviar solicitação:', error);
-      alert('Erro ao enviar solicitação. Tente novamente.');
+      showError('Erro ao enviar solicitação. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -413,10 +421,11 @@ const Users = ({ openCreateModal = false }) => {
     if (window.confirm('ATENÇÃO: Esta ação irá excluir permanentemente o usuário e todos os seus dados. Esta ação não pode ser desfeita. Tem certeza que deseja continuar?')) {
       try {
         await api.delete(`/users/${id}/permanent`);
+        showSuccess('Usuário excluído permanentemente!');
         fetchUsers();
       } catch (error) {
         console.error('Erro ao excluir usuário permanentemente:', error);
-        alert('Erro ao excluir usuário. Tente novamente.');
+        showError('Erro ao excluir usuário. Tente novamente.');
       }
     }
   };

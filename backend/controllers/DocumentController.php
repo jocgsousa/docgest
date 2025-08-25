@@ -170,7 +170,7 @@ class DocumentController {
             $validator->required('empresa_id', 'Empresa é obrigatória');
             
             // Validar status se fornecido
-            $validStatuses = ['rascunho', 'enviado', 'assinado', 'cancelado'];
+            $validStatuses = ['rascunho', 'enviado', 'assinado', 'cancelado', 'arquivo'];
             if (!empty($data['status']) && !in_array($data['status'], $validStatuses)) {
                 $validator->addError('status', 'Status inválido');
             }
@@ -373,7 +373,7 @@ class DocumentController {
             }
             
             // Validar status se fornecido
-            $validStatuses = ['rascunho', 'enviado', 'assinado', 'cancelado'];
+            $validStatuses = ['rascunho', 'enviado', 'assinado', 'cancelado', 'arquivo'];
             if (isset($_POST['status']) && !in_array($_POST['status'], $validStatuses)) {
                 Response::validation(['status' => ['Status inválido']]);
                 return;

@@ -7,6 +7,7 @@ import LandingHeader from '../components/layout/LandingHeader';
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 import { useApp } from '../contexts/AppContext';
+import { useToast } from '../contexts/ToastContext';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -266,6 +267,7 @@ const FooterText = styled.p`
 function Contato() {
   const navigate = useNavigate();
   const { appInfo } = useApp();
+  const { showSuccess, showError } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -289,13 +291,17 @@ function Contato() {
 
   const validateForm = () => {
     if (!formData.nome || !formData.email || !formData.assunto || !formData.mensagem) {
-      setError('Por favor, preencha todos os campos obrigatórios.');
+      const errorMessage = 'Por favor, preencha todos os campos obrigatórios.';
+      setError(errorMessage);
+      showError(errorMessage);
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError('Por favor, insira um e-mail válido.');
+      const errorMessage = 'Por favor, insira um e-mail válido.';
+      setError(errorMessage);
+      showError(errorMessage);
       return false;
     }
 
@@ -316,6 +322,7 @@ function Contato() {
     try {
       await api.post('/contact', formData);
       setSuccess(true);
+      showSuccess('Mensagem enviada com sucesso! Entraremos em contato em breve.');
       setFormData({
         nome: '',
         email: '',
@@ -325,10 +332,10 @@ function Contato() {
         mensagem: ''
       });
     } catch (err) {
-      setError(
-        err.response?.data?.message || 
-        'Erro ao enviar mensagem. Tente novamente ou entre em contato por telefone.'
-      );
+      const errorMessage = err.response?.data?.message || 
+        'Erro ao enviar mensagem. Tente novamente ou entre em contato por telefone.';
+      setError(errorMessage);
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
