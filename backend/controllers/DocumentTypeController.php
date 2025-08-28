@@ -24,8 +24,16 @@ class DocumentTypeController {
             $search = isset($_GET['search']) ? trim($_GET['search']) : '';
             $status = isset($_GET['status']) ? $_GET['status'] : '';
             
-            // Buscar tipos de documentos com paginação
-            $result = $this->documentType->findAllPaginated($page, $limit, $search, $status);
+            // Buscar tipos de documentos com paginação e filtros de permissão
+            $result = $this->documentType->findAllPaginated(
+                $page, 
+                $limit, 
+                $search, 
+                $status,
+                $user['user_id'],
+                $user['tipo_usuario'],
+                $user['empresa_id']
+            );
             
             Response::success([
                 'data' => $result['data'],
@@ -88,7 +96,9 @@ class DocumentTypeController {
             $data = [
                 'nome' => trim($requestData['nome'] ?? ''),
                 'descricao' => trim($requestData['descricao'] ?? ''),
-                'ativo' => isset($requestData['ativo']) ? (bool)$requestData['ativo'] : true
+                'ativo' => isset($requestData['ativo']) ? (bool)$requestData['ativo'] : true,
+                'criado_por' => $user['user_id'],
+                'empresa_id' => $user['tipo_usuario'] == 1 ? null : $user['empresa_id'] // Super Admin cria global, outros criam para sua empresa
             ];
             
             $validator = new Validator($data);
@@ -101,8 +111,8 @@ class DocumentTypeController {
                 return;
             }
             
-            // Verificar se já existe um tipo com o mesmo nome
-            if ($this->documentType->existsByName($data['nome'])) {
+            // Verificar se já existe um tipo com o mesmo nome na mesma empresa
+            if ($this->documentType->existsByName($data['nome'], $data['empresa_id'])) {
                 Response::validation(['nome' => ['Já existe um tipo de documento com este nome']]);
                 return;
             }
@@ -134,6 +144,12 @@ class DocumentTypeController {
             
             if (!$documentType) {
                 Response::notFound('Tipo de documento não encontrado');
+                return;
+            }
+            
+            // Verificar permissão de edição
+            if (!$this->documentType->canEdit($id, $user['user_id'], $user['tipo_usuario'], $user['empresa_id'])) {
+                Response::forbidden('Você não tem permissão para editar este tipo de documento');
                 return;
             }
             
@@ -172,8 +188,8 @@ class DocumentTypeController {
                 return;
             }
             
-            // Verificar se já existe outro tipo com o mesmo nome
-            if ($data['nome'] !== $documentType['nome'] && $this->documentType->existsByName($data['nome'])) {
+            // Verificar se já existe outro tipo com o mesmo nome na mesma empresa
+            if ($data['nome'] !== $documentType['nome'] && $this->documentType->existsByName($data['nome'], $documentType['empresa_id'])) {
                 Response::validation(['nome' => ['Já existe um tipo de documento com este nome']]);
                 return;
             }
@@ -208,6 +224,12 @@ class DocumentTypeController {
                 return;
             }
             
+            // Verificar permissão de exclusão
+            if (!$this->documentType->canDelete($id, $user['user_id'], $user['tipo_usuario'], $user['empresa_id'])) {
+                Response::forbidden('Você não tem permissão para excluir este tipo de documento');
+                return;
+            }
+            
             // Verificar se existem documentos usando este tipo
             if ($this->documentType->hasDocuments($id)) {
                 Response::validation(['id' => ['Não é possível excluir este tipo de documento pois existem documentos vinculados a ele']]);
@@ -223,6 +245,23 @@ class DocumentTypeController {
             }
         } catch (Exception $e) {
             Response::error('Erro ao excluir tipo de documento: ' . $e->getMessage());
+        }
+    }
+    
+    public function active() {
+        try {
+            $user = JWT::requireAuth();
+            
+            // Buscar apenas tipos de documentos ativos com filtros de permissão
+            $documentTypes = $this->documentType->getActiveTypes(
+                $user['user_id'],
+                $user['tipo_usuario'],
+                $user['empresa_id']
+            );
+            
+            Response::success($documentTypes, 'Tipos de documentos ativos listados com sucesso');
+        } catch (Exception $e) {
+            Response::error('Erro ao listar tipos de documentos ativos: ' . $e->getMessage());
         }
     }
 }

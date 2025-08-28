@@ -191,6 +191,12 @@ class DocumentController {
                 }
             }
             
+            // Validar que usuários assinantes não podem definir assinantes
+            if ($user['tipo_usuario'] == 3 && !empty($data['assinantes'])) {
+                Response::forbidden('Usuários assinantes não podem definir assinantes para documentos');
+                return;
+            }
+            
             // Validar e processar assinantes
             $assinantes = [];
             if (is_string($data['assinantes'])) {
@@ -453,6 +459,12 @@ class DocumentController {
                     // Gerar novo hash quando o arquivo é modificado
                     $updateData['hash_acesso'] = $this->generateAccessHash();
                 }
+            }
+            
+            // Validar que usuários assinantes não podem definir assinantes
+            if ($user['tipo_usuario'] == 3 && isset($_POST['assinantes']) && !empty($_POST['assinantes'])) {
+                Response::forbidden('Usuários assinantes não podem definir assinantes para documentos');
+                return;
             }
             
             // Processar assinantes se fornecidos

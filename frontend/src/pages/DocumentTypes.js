@@ -102,6 +102,16 @@ const DocumentTypes = () => {
       render: (value) => value || '-'
     },
     {
+      key: 'criado_por_nome',
+      title: 'Criado por',
+      render: (value) => value || '-'
+    },
+    {
+      key: 'empresa_nome',
+      title: 'Empresa',
+      render: (value) => value || 'Global'
+    },
+    {
       key: 'ativo',
       title: 'Status',
       render: (value) => (
@@ -120,23 +130,23 @@ const DocumentTypes = () => {
       title: 'Ações',
       render: (_, row) => (
         <div style={{ display: 'flex', gap: '8px' }}>
-          {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
-            <>
-              <Button
-                size="sm"
-                $variant="outline"
-                onClick={() => handleEdit(row)}
-              >
-                <FaEdit /> Editar
-              </Button>
-              <Button
-                size="sm"
-                $variant="danger"
-                onClick={() => handleDelete(row.id)}
-              >
-                <FaTrash /> Excluir
-              </Button>
-            </>
+          {canEditDocumentType(row) && (
+            <Button
+              size="sm"
+              $variant="outline"
+              onClick={() => handleEdit(row)}
+            >
+              <FaEdit /> Editar
+            </Button>
+          )}
+          {canDeleteDocumentType(row) && (
+            <Button
+              size="sm"
+              $variant="danger"
+              onClick={() => handleDelete(row.id)}
+            >
+              <FaTrash /> Excluir
+            </Button>
           )}
         </div>
       )
@@ -279,13 +289,50 @@ const DocumentTypes = () => {
     setPagination(prev => ({ ...prev, pageSize, page: 1 }));
   };
 
+  // Verificar se o usuário pode editar um tipo de documento
+  const canEditDocumentType = (documentType) => {
+    // Super Admin pode editar tudo
+    if (user?.tipo_usuario === 1) {
+      return true;
+    }
+    
+    // Admin de empresa pode editar apenas tipos da sua empresa criados por ele
+    if (user?.tipo_usuario === 2) {
+      return documentType.empresa_id === user.empresa_id && 
+             documentType.criado_por === user.id;
+    }
+    
+    return false;
+  };
+
+  // Verificar se o usuário pode excluir um tipo de documento
+  const canDeleteDocumentType = (documentType) => {
+    // Super Admin pode excluir tudo
+    if (user?.tipo_usuario === 1) {
+      return true;
+    }
+    
+    // Admin de empresa pode excluir apenas tipos da sua empresa criados por ele
+    if (user?.tipo_usuario === 2) {
+      return documentType.empresa_id === user.empresa_id && 
+             documentType.criado_por === user.id;
+    }
+    
+    return false;
+  };
+
+  // Verificar se o usuário pode criar novos tipos de documento
+  const canCreateDocumentType = () => {
+    return user?.tipo_usuario === 1 || user?.tipo_usuario === 2;
+  };
+
   return (
     <PageContainer>
       <PageHeader>
         <PageTitle>
           <FaTag /> Classificação de Documentos
         </PageTitle>
-        {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
+        {canCreateDocumentType() && (
           <Button onClick={handleCreate}>
             <FaPlus /> Novo Tipo
           </Button>

@@ -321,6 +321,35 @@ class BranchController {
     }
     
     /**
+     * Lista filiais para usuários (incluindo assinantes)
+     */
+    public function listForUsers() {
+        try {
+            $user = JWT::requireAuth();
+            
+            $empresaId = null;
+            
+            // Super admin pode filtrar por empresa_id se fornecido
+            if ($user['tipo_usuario'] == 1) {
+                if (isset($_GET['empresa_id']) && !empty($_GET['empresa_id'])) {
+                    $empresaId = $_GET['empresa_id'];
+                }
+            }
+            // Admin de empresa e assinantes só podem ver filiais da sua empresa
+            elseif ($user['tipo_usuario'] == 2 || $user['tipo_usuario'] == 3) {
+                $empresaId = $user['empresa_id'];
+            }
+            
+            $branches = $this->branchModel->listAll($empresaId);
+            
+            Response::success($branches, 'Filiais recuperadas com sucesso');
+            
+        } catch (Exception $e) {
+            Response::handleException($e);
+        }
+    }
+    
+    /**
      * Estatísticas das filiais
      */
     public function stats() {

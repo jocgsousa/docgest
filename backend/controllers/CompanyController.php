@@ -347,6 +347,31 @@ class CompanyController {
     }
     
     /**
+     * Lista empresas para usuários (incluindo assinantes)
+     */
+    public function listForUsers() {
+        try {
+            $user = JWT::requireAuth();
+            
+            $companies = [];
+            
+            // Super admin pode ver todas as empresas
+            if ($user['tipo_usuario'] == 1) {
+                $companies = $this->companyModel->listAll();
+            }
+            // Admin de empresa e assinantes só podem ver sua própria empresa
+            elseif ($user['tipo_usuario'] == 2 || $user['tipo_usuario'] == 3) {
+                $companies = $this->companyModel->listByUser($user['empresa_id']);
+            }
+            
+            Response::success($companies, 'Empresas recuperadas com sucesso');
+            
+        } catch (Exception $e) {
+            Response::handleException($e);
+        }
+    }
+    
+    /**
      * Empresas com vencimento próximo
      */
     public function expiring() {

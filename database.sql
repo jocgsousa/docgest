@@ -107,11 +107,16 @@ CREATE TABLE usuarios (
 -- ================================================
 CREATE TABLE tipos_documentos (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL UNIQUE,
+    nome VARCHAR(100) NOT NULL,
     descricao TEXT,
+    criado_por INT NOT NULL COMMENT 'ID do usuário que criou a classificação',
+    empresa_id INT COMMENT 'ID da empresa (NULL para classificações do super admin)',
     ativo BOOLEAN DEFAULT TRUE,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_nome_empresa (nome, empresa_id)
 );
 
 -- ================================================
@@ -227,20 +232,20 @@ INSERT INTO profissoes (nome, descricao) VALUES
 ('Empresário', 'Proprietário de empresa'),
 ('Outros', 'Outras profissões não listadas');
 
--- Tipos de documentos padrão
-INSERT INTO tipos_documentos (nome, descricao) VALUES
-('Contrato', 'Contratos em geral'),
-('Holerite', 'Folha de pagamento'),
-('Declaração', 'Declarações diversas'),
-('Procuração', 'Procurações e mandatos'),
-('Termo de Compromisso', 'Termos de compromisso e responsabilidade'),
-('Ata', 'Atas de reunião'),
-('Relatório', 'Relatórios técnicos e gerenciais'),
-('Proposta Comercial', 'Propostas e orçamentos'),
-('Acordo', 'Acordos e termos'),
-('Certificado', 'Certificados diversos'),
-('Autorização', 'Autorizações e permissões'),
-('Outros', 'Outros tipos de documentos');
+-- Tipos de documentos padrão (criados pelo Super Admin)
+INSERT INTO tipos_documentos (nome, descricao, criado_por, empresa_id) VALUES
+('Contrato', 'Contratos em geral', 1, NULL),
+('Holerite', 'Folha de pagamento', 1, NULL),
+('Declaração', 'Declarações diversas', 1, NULL),
+('Procuração', 'Procurações e mandatos', 1, NULL),
+('Termo de Compromisso', 'Termos de compromisso e responsabilidade', 1, NULL),
+('Ata', 'Atas de reunião', 1, NULL),
+('Relatório', 'Relatórios técnicos e gerenciais', 1, NULL),
+('Proposta Comercial', 'Propostas e orçamentos', 1, NULL),
+('Acordo', 'Acordos e termos', 1, NULL),
+('Certificado', 'Certificados diversos', 1, NULL),
+('Autorização', 'Autorizações e permissões', 1, NULL),
+('Outros', 'Outros tipos de documentos', 1, NULL);
 
 -- Empresa exemplo
 INSERT INTO empresas (nome, cnpj, codigo_empresa, email, telefone, endereco, cidade, estado, cep, plano_id, data_vencimento) VALUES
@@ -272,6 +277,8 @@ CREATE INDEX idx_profissoes_ativo ON profissoes(ativo);
 CREATE INDEX idx_empresas_cnpj ON empresas(cnpj);
 CREATE INDEX idx_tipos_documentos_nome ON tipos_documentos(nome);
 CREATE INDEX idx_tipos_documentos_ativo ON tipos_documentos(ativo);
+CREATE INDEX idx_tipos_documentos_criado_por ON tipos_documentos(criado_por);
+CREATE INDEX idx_tipos_documentos_empresa ON tipos_documentos(empresa_id);
 CREATE INDEX idx_documentos_empresa ON documentos(empresa_id);
 CREATE INDEX idx_documentos_status ON documentos(status);
 CREATE INDEX idx_documentos_tipo ON documentos(tipo_documento_id);

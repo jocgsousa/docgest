@@ -258,6 +258,8 @@ try {
                         $controller->index();
                     } elseif ($id === 'all') {
                         $controller->listAll();
+                    } elseif ($id === 'for-users') {
+                        $controller->listForUsers();
                     } elseif ($id === 'stats') {
                         $controller->stats();
                     } elseif ($id === 'expiring') {
@@ -314,6 +316,8 @@ try {
                         $controller->index();
                     } elseif ($id === 'all') {
                         $controller->listAll();
+                    } elseif ($id === 'for-users') {
+                        $controller->listForUsers();
                     } elseif ($id === 'stats') {
                         $controller->stats();
                     } elseif ($action === null) {
@@ -464,6 +468,8 @@ try {
                 case 'GET':
                     if ($id === null) {
                         $controller->index();
+                    } elseif ($id === 'active' && $action === null) {
+                        $controller->active();
                     } elseif ($action === null) {
                         $controller->show($id);
                     } else {

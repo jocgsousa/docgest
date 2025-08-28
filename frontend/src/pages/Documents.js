@@ -342,6 +342,17 @@ const Documents = ({ openCreateModal = false }) => {
     loadDocumentTypes();
   }, []);
 
+  // Inicializar campos para usuários assinantes
+  useEffect(() => {
+    if (user && user.tipo_usuario === 3 && user.empresa_id) {
+      setFormData(prev => ({
+        ...prev,
+        empresa_id: user.empresa_id.toString(),
+        filial_id: user.filial_id ? user.filial_id.toString() : ''
+      }));
+    }
+  }, [user, companies]);
+
   const loadUploadConfig = async () => {
     try {
       const config = await publicApi.getUploadConfig();
@@ -393,7 +404,7 @@ const Documents = ({ openCreateModal = false }) => {
   // Carregar empresas
   const loadCompanies = async () => {
     try {
-      const response = await api.get('/companies/all');
+      const response = await api.get('/companies/for-users');
       if (response.data.success) {
         setCompanies(Array.isArray(response.data.data) ? response.data.data : []);
       }
@@ -406,7 +417,7 @@ const Documents = ({ openCreateModal = false }) => {
   // Carregar filiais por empresa
   const loadBranches = async (empresaId) => {
     try {
-      const response = await api.get(`/branches/all?empresa_id=${empresaId}`);
+      const response = await api.get(`/branches/for-users?empresa_id=${empresaId}`);
       if (response.data.success) {
         setBranches(Array.isArray(response.data.data) ? response.data.data : []);
       }
@@ -739,7 +750,7 @@ const Documents = ({ openCreateModal = false }) => {
   };
 
   const resetForm = () => {
-    setFormData({ 
+    const baseFormData = { 
       titulo: '', 
       descricao: '', 
       arquivo: null, 
@@ -751,7 +762,15 @@ const Documents = ({ openCreateModal = false }) => {
       prazo_assinatura: '',
       competencia: '',
       validade_legal: ''
-    });
+    };
+    
+    // Para usuários assinantes, manter empresa_id e filial_id preenchidos
+    if (user && user.tipo_usuario === 3 && user.empresa_id) {
+      baseFormData.empresa_id = user.empresa_id.toString();
+      baseFormData.filial_id = user.filial_id ? user.filial_id.toString() : '';
+    }
+    
+    setFormData(baseFormData);
     setErrors({});
   };
 
@@ -1108,95 +1127,95 @@ const Documents = ({ openCreateModal = false }) => {
             </div>
           </FormGrid>
 
-          <FormRow>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                Assinantes
-              </label>
-              <div style={{ 
-                border: '1px solid #d1d5db', 
-                borderRadius: '6px', 
-                maxHeight: '150px', 
-                overflowY: 'auto',
-                padding: '8px'
-              }}>
-                {loadingUsers ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
-                    Carregando usuários...
-                  </div>
-                ) : availableUsers.length === 0 ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
-                    {formData.empresa_id ? 'Nenhum usuário encontrado' : 'Selecione uma empresa primeiro'}
-                  </div>
-                ) : (
-                  Array.isArray(availableUsers) && availableUsers.map(user => (
-                    <label key={user.id} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
-                      padding: '4px 0',
-                      cursor: 'pointer'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={formData.assinantes.includes(user.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              assinantes: [...prev.assinantes, user.id]
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              assinantes: prev.assinantes.filter(id => id !== user.id)
-                            }));
-                          }
-                        }}
-                      />
-                      <span style={{ fontSize: '14px' }}>
-                        {user.nome} ({user.email})
-                      </span>
-                    </label>
-                  ))
-                )}
-              </div>
-              {errors.assinantes && (
-                <span style={{ color: '#dc2626', fontSize: '12px' }}>
-                  {errors.assinantes}
-                </span>
-              )}
-            </div>
-
-
-
-              {/* Campo Prazo de Assinatura - só aparece quando há assinantes */}
-            {formData.assinantes && formData.assinantes.length > 0 && (
+          {/* Campo de Assinantes - apenas para Admin e Administrador de Empresa */}
+          {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
+            <FormRow>
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                  Prazo para Assinatura
+                  Assinantes
                 </label>
-                <input
-                  type="date"
-                  value={formData.prazo_assinatura}
-                  onChange={(e) => setFormData(prev => ({ ...prev, prazo_assinatura: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
-                {errors.prazo_assinatura && (
+                <div style={{ 
+                  border: '1px solid #d1d5db', 
+                  borderRadius: '6px', 
+                  maxHeight: '150px', 
+                  overflowY: 'auto',
+                  padding: '8px'
+                }}>
+                  {loadingUsers ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                      Carregando usuários...
+                    </div>
+                  ) : availableUsers.length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                      {formData.empresa_id ? 'Nenhum usuário encontrado' : 'Selecione uma empresa primeiro'}
+                    </div>
+                  ) : (
+                    Array.isArray(availableUsers) && availableUsers.map(user => (
+                      <label key={user.id} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        padding: '4px 0',
+                        cursor: 'pointer'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.assinantes.includes(user.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData(prev => ({
+                                ...prev,
+                                assinantes: [...prev.assinantes, user.id]
+                              }));
+                            } else {
+                              setFormData(prev => ({
+                                ...prev,
+                                assinantes: prev.assinantes.filter(id => id !== user.id)
+                              }));
+                            }
+                          }}
+                        />
+                        <span style={{ fontSize: '14px' }}>
+                          {user.nome} ({user.email})
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {errors.assinantes && (
                   <span style={{ color: '#dc2626', fontSize: '12px' }}>
-                    {errors.prazo_assinatura[0]}
+                    {errors.assinantes}
                   </span>
                 )}
               </div>
-            )}
 
-          </FormRow>
+              {/* Campo Prazo de Assinatura - só aparece quando há assinantes */}
+              {formData.assinantes && formData.assinantes.length > 0 && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                    Prazo para Assinatura
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.prazo_assinatura}
+                    onChange={(e) => setFormData(prev => ({ ...prev, prazo_assinatura: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  {errors.prazo_assinatura && (
+                    <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                      {errors.prazo_assinatura[0]}
+                    </span>
+                  )}
+                </div>
+              )}
+            </FormRow>
+          )}
 
           {/* Campo de Status - apenas para Admin e Super Admin */}
           {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
