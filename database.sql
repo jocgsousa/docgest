@@ -132,6 +132,7 @@ CREATE TABLE documentos (
     tipo_arquivo VARCHAR(100),
     hash_acesso VARCHAR(64) UNIQUE NOT NULL,
     status ENUM('rascunho','enviado','assinado','cancelado','arquivo') DEFAULT 'rascunho',
+    solicitar_assinatura BOOLEAN DEFAULT FALSE COMMENT 'Indica se o documento requer assinatura',
     tipo_documento_id INT,
     prazo_assinatura DATE COMMENT 'Data limite até quando o documento pode ser assinado',
     competencia DATE COMMENT 'Mês/ano de competência do documento (ex: folha de pagamento)',
@@ -195,6 +196,10 @@ CREATE TABLE documento_assinantes (
     documento_id INT NOT NULL,
     usuario_id INT NOT NULL,
     status ENUM('pendente','visualizado','assinado','rejeitado') DEFAULT 'pendente',
+    tipo_assinatura ENUM('eletronica','digital') COMMENT 'Tipo de assinatura escolhida pelo usuário',
+    hash_assinatura VARCHAR(255) COMMENT 'Hash da assinatura eletrônica ou caminho do certificado digital',
+    ip_assinatura VARCHAR(45) COMMENT 'IP do usuário no momento da assinatura',
+    user_agent TEXT COMMENT 'User agent do navegador no momento da assinatura',
     data_visualizacao DATETIME,
     data_assinatura DATETIME,
     observacoes TEXT,
@@ -204,6 +209,27 @@ CREATE TABLE documento_assinantes (
     FOREIGN KEY (documento_id) REFERENCES documentos(id) ON DELETE CASCADE,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     UNIQUE KEY unique_documento_usuario (documento_id, usuario_id)
+);
+
+-- ================================================
+-- DOCUMENTO ASSINANTES SOLICITADOS (Usuários selecionados para assinar documentos)
+-- ================================================
+CREATE TABLE documento_assinantes_solicitados (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    documento_id INT NOT NULL,
+    usuario_id INT NOT NULL,
+    solicitado_por INT NOT NULL COMMENT 'ID do usuário que solicitou a assinatura',
+    status ENUM('pendente','notificado','assinado','rejeitado','cancelado') DEFAULT 'pendente',
+    data_solicitacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_notificacao DATETIME,
+    observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (documento_id) REFERENCES documentos(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (solicitado_por) REFERENCES usuarios(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_documento_usuario_solicitado (documento_id, usuario_id)
 );
 
 -- ================================================
@@ -285,6 +311,13 @@ CREATE INDEX idx_documentos_tipo ON documentos(tipo_documento_id);
 CREATE INDEX idx_documentos_prazo_assinatura ON documentos(prazo_assinatura);
 CREATE INDEX idx_documentos_competencia ON documentos(competencia);
 CREATE INDEX idx_documentos_validade_legal ON documentos(validade_legal);
+CREATE INDEX idx_documentos_solicitar_assinatura ON documentos(solicitar_assinatura);
+CREATE INDEX idx_documento_assinantes_documento ON documento_assinantes(documento_id);
+CREATE INDEX idx_documento_assinantes_usuario ON documento_assinantes(usuario_id);
+CREATE INDEX idx_documento_assinantes_status ON documento_assinantes(status);
+CREATE INDEX idx_documento_assinantes_solicitados_documento ON documento_assinantes_solicitados(documento_id);
+CREATE INDEX idx_documento_assinantes_solicitados_usuario ON documento_assinantes_solicitados(usuario_id);
+CREATE INDEX idx_documento_assinantes_solicitados_status ON documento_assinantes_solicitados(status);
 CREATE INDEX idx_assinaturas_documento ON assinaturas(documento_id);
 CREATE INDEX idx_assinaturas_status ON assinaturas(status);
 CREATE UNIQUE INDEX idx_signatarios_token ON signatarios(token);

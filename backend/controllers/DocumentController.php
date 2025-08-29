@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/Document.php';
 require_once __DIR__ . '/../models/DocumentAssinante.php';
+require_once __DIR__ . '/../models/DocumentAssinanteSolicitado.php';
 require_once __DIR__ . '/../models/Settings.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../utils/Validator.php';
@@ -10,11 +11,13 @@ require_once __DIR__ . '/../utils/JWT.php';
 class DocumentController {
     private $document;
     private $documentAssinante;
+    private $documentAssinanteSolicitado;
     private $validator;
     
     public function __construct() {
         $this->document = new Document();
         $this->documentAssinante = new DocumentAssinante();
+        $this->documentAssinanteSolicitado = new DocumentAssinanteSolicitado();
         $this->validator = new Validator();
     }
     
@@ -158,6 +161,8 @@ class DocumentController {
                 'empresa_id' => $_POST['empresa_id'] ?? '',
                 'filial_id' => $_POST['filial_id'] ?? null,
                 'assinantes' => $_POST['assinantes'] ?? '',
+                'solicitar_assinatura' => isset($_POST['solicitar_assinatura']) ? (bool)$_POST['solicitar_assinatura'] : false,
+                'assinantes_solicitados' => $_POST['assinantes_solicitados'] ?? '',
                 'status' => $_POST['status'] ?? 'rascunho',
                 'tipo_documento_id' => $_POST['tipo_documento_id'] ?? null,
                 'prazo_assinatura' => $_POST['prazo_assinatura'] ?? null,
@@ -191,9 +196,15 @@ class DocumentController {
                 }
             }
             
-            // Validar que usuários assinantes não podem definir assinantes
-            if ($user['tipo_usuario'] == 3 && !empty($data['assinantes'])) {
-                Response::forbidden('Usuários assinantes não podem definir assinantes para documentos');
+            // Validar que usuários assinantes não podem definir assinantes ou solicitar assinatura
+            if ($user['tipo_usuario'] == 3 && (!empty($data['assinantes']) || $data['solicitar_assinatura'])) {
+                Response::forbidden('Usuários assinantes não podem definir assinantes ou solicitar assinatura para documentos');
+                return;
+            }
+            
+            // Validar que apenas Admin Empresa e Super Admin podem solicitar assinatura
+            if ($data['solicitar_assinatura'] && !in_array($user['tipo_usuario'], [1, 2])) {
+                Response::forbidden('Apenas administradores podem solicitar assinatura de documentos');
                 return;
             }
             
@@ -257,6 +268,7 @@ class DocumentController {
                 'tamanho_arquivo' => $file['size'],
                 'tipo_arquivo' => $file['type'],
                 'status' => $data['status'],
+                'solicitar_assinatura' => $data['solicitar_assinatura'],
                 'criado_por' => $user['user_id'],
                 'empresa_id' => $data['empresa_id'],
                 'filial_id' => $data['filial_id'],
@@ -270,6 +282,15 @@ class DocumentController {
             $documentData = array_filter($documentData, function($value) {
                 return $value !== null;
             });
+            
+            // Processar assinantes solicitados se fornecidos
+            $assinantesSolicitados = [];
+            if ($data['solicitar_assinatura'] && !empty($data['assinantes_solicitados'])) {
+                $assinantesSolicitados = json_decode($data['assinantes_solicitados'], true);
+                if (!is_array($assinantesSolicitados)) {
+                    $assinantesSolicitados = [];
+                }
+            }
             
             $documentId = $this->document->create($documentData);
             
@@ -286,6 +307,23 @@ class DocumentController {
                         ];
                         
                         if (!$this->documentAssinante->create($assinanteData)) {
+                            $assinantesCreated = false;
+                            break;
+                        }
+                    }
+                }
+                
+                // Criar assinantes solicitados se fornecidos
+                if (!empty($assinantesSolicitados)) {
+                    foreach ($assinantesSolicitados as $assinante) {
+                        $assinanteData = [
+                            'documento_id' => $documentId,
+                            'usuario_id' => $assinante,
+                            'status' => 'pendente',
+                            'data_solicitacao' => date('Y-m-d H:i:s')
+                        ];
+                        
+                        if (!$this->documentAssinanteSolicitado->create($assinanteData)) {
                             $assinantesCreated = false;
                             break;
                         }
@@ -394,7 +432,8 @@ class DocumentController {
                 'tipo_documento_id' => $data['tipo_documento_id'],
                 'prazo_assinatura' => $data['prazo_assinatura'],
                 'competencia' => $data['competencia'],
-                'validade_legal' => $data['validade_legal']
+                'validade_legal' => $data['validade_legal'],
+                'solicitar_assinatura' => isset($_POST['solicitar_assinatura']) ? (bool)$_POST['solicitar_assinatura'] : $document['solicitar_assinatura']
             ];
             
             // Verificar se o documento possui hash_acesso, se não tiver, gerar um
@@ -461,9 +500,15 @@ class DocumentController {
                 }
             }
             
-            // Validar que usuários assinantes não podem definir assinantes
-            if ($user['tipo_usuario'] == 3 && isset($_POST['assinantes']) && !empty($_POST['assinantes'])) {
-                Response::forbidden('Usuários assinantes não podem definir assinantes para documentos');
+            // Validar que usuários assinantes não podem definir assinantes ou solicitar assinatura
+            if ($user['tipo_usuario'] == 3 && (isset($_POST['assinantes']) && !empty($_POST['assinantes']) || isset($_POST['solicitar_assinatura']) && $_POST['solicitar_assinatura'])) {
+                Response::forbidden('Usuários assinantes não podem definir assinantes ou solicitar assinatura para documentos');
+                return;
+            }
+            
+            // Validar que apenas Admin Empresa e Super Admin podem solicitar assinatura
+            if (isset($_POST['solicitar_assinatura']) && $_POST['solicitar_assinatura'] && !in_array($user['tipo_usuario'], [1, 2])) {
+                Response::forbidden('Apenas administradores podem solicitar assinatura de documentos');
                 return;
             }
             
@@ -473,6 +518,15 @@ class DocumentController {
                 $assinantes = json_decode($_POST['assinantes'], true);
                 if (!is_array($assinantes)) {
                     $assinantes = [];
+                }
+            }
+            
+            // Processar assinantes solicitados se fornecidos
+            $assinantesSolicitados = [];
+            if (isset($_POST['assinantes_solicitados']) && !empty($_POST['assinantes_solicitados'])) {
+                $assinantesSolicitados = json_decode($_POST['assinantes_solicitados'], true);
+                if (!is_array($assinantesSolicitados)) {
+                    $assinantesSolicitados = [];
                 }
             }
             
@@ -492,6 +546,24 @@ class DocumentController {
                         ];
                         
                         $this->documentAssinante->create($assinanteData);
+                    }
+                }
+                
+                // Atualizar assinantes solicitados se fornecidos
+                if (!empty($assinantesSolicitados)) {
+                    // Remover assinantes solicitados existentes
+                    $this->documentAssinanteSolicitado->deleteByDocumentId($id);
+                    
+                    // Criar novos assinantes solicitados
+                    foreach ($assinantesSolicitados as $assinante) {
+                        $assinanteData = [
+                            'documento_id' => $id,
+                            'usuario_id' => $assinante,
+                            'status' => 'pendente',
+                            'data_solicitacao' => date('Y-m-d H:i:s')
+                        ];
+                        
+                        $this->documentAssinanteSolicitado->create($assinanteData);
                     }
                 }
                 
@@ -857,6 +929,162 @@ class DocumentController {
         }
     }
     
+    /**
+     * Processa assinatura de documento solicitado
+     */
+    public function signDocument() {
+        try {
+            $user = JWT::requireAuth();
+            
+            // Apenas usuários assinantes podem assinar documentos
+            if ($user['tipo_usuario'] != 3) {
+                Response::forbidden('Apenas usuários assinantes podem assinar documentos');
+                return;
+            }
+            
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            // Validar dados obrigatórios
+            $errors = [];
+            if (empty($input['documento_id'])) {
+                $errors['documento_id'] = ['ID do documento é obrigatório'];
+            }
+            if (empty($input['tipo_assinatura']) || !in_array($input['tipo_assinatura'], ['eletronica', 'digital'])) {
+                $errors['tipo_assinatura'] = ['Tipo de assinatura inválido'];
+            }
+            
+            if (!empty($errors)) {
+                Response::validation($errors);
+                return;
+            }
+            
+            $documentoId = $input['documento_id'];
+            $tipoAssinatura = $input['tipo_assinatura'];
+            $observacoes = $input['observacoes'] ?? '';
+            
+            // Buscar o documento
+            $document = $this->document->findById($documentoId);
+            if (!$document) {
+                Response::notFound('Documento não encontrado');
+                return;
+            }
+            
+            // Verificar se o documento solicita assinatura
+            if (!$document['solicitar_assinatura']) {
+                Response::validation(['documento_id' => ['Este documento não solicita assinatura']]);
+                return;
+            }
+            
+            // Verificar se o usuário está na lista de assinantes solicitados
+            $assinanteSolicitado = $this->documentAssinanteSolicitado->findByDocumentAndUser($documentoId, $user['id']);
+            if (!$assinanteSolicitado) {
+                Response::forbidden('Você não está autorizado a assinar este documento');
+                return;
+            }
+            
+            // Verificar se já foi assinado
+            if ($assinanteSolicitado['status'] === 'assinado') {
+                Response::validation(['documento_id' => ['Você já assinou este documento']]);
+                return;
+            }
+            
+            // Verificar se foi rejeitado
+            if ($assinanteSolicitado['status'] === 'rejeitado') {
+                Response::validation(['documento_id' => ['Você rejeitou a assinatura deste documento']]);
+                return;
+            }
+            
+            // Processar certificado digital se fornecido
+            $certificadoPath = null;
+            if ($tipoAssinatura === 'digital' && isset($_FILES['certificado'])) {
+                $uploadResult = $this->handleCertificateUpload($_FILES['certificado']);
+                if ($uploadResult['success']) {
+                    $certificadoPath = $uploadResult['path'];
+                } else {
+                    Response::validation(['certificado' => [$uploadResult['error']]]);
+                    return;
+                }
+            }
+            
+            // Atualizar status do assinante solicitado
+            $updateData = [
+                'status' => 'assinado',
+                'data_assinatura' => date('Y-m-d H:i:s'),
+                'tipo_assinatura' => $tipoAssinatura,
+                'observacoes' => $observacoes
+            ];
+            
+            if ($certificadoPath) {
+                $updateData['certificado_path'] = $certificadoPath;
+            }
+            
+            if ($this->documentAssinanteSolicitado->updateStatus($assinanteSolicitado['id'], $updateData)) {
+                // Verificar se todos os assinantes solicitados já assinaram
+                $todosAssinantes = $this->documentAssinanteSolicitado->findByDocument($documentoId);
+                $todosAssinaram = true;
+                
+                foreach ($todosAssinantes as $assinante) {
+                    if ($assinante['status'] !== 'assinado') {
+                        $todosAssinaram = false;
+                        break;
+                    }
+                }
+                
+                // Se todos assinaram, atualizar status do documento
+                if ($todosAssinaram) {
+                    $this->document->updateStatus($documentoId, 'assinado');
+                }
+                
+                Response::success(null, 'Documento assinado com sucesso');
+            } else {
+                Response::error('Erro ao processar assinatura');
+            }
+            
+        } catch (Exception $e) {
+            Response::error('Erro ao processar assinatura: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Processa upload de certificado digital
+     */
+    private function handleCertificateUpload($file) {
+        // Verificar se houve erro no upload
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            return ['success' => false, 'error' => 'Erro no upload do certificado'];
+        }
+        
+        // Verificar tamanho do arquivo (máximo 5MB)
+        if ($file['size'] > 5 * 1024 * 1024) {
+            return ['success' => false, 'error' => 'Certificado muito grande. Máximo 5MB'];
+        }
+        
+        // Verificar extensão do arquivo
+        $allowedExtensions = ['p12', 'pfx', 'pem', 'crt', 'cer'];
+        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        
+        if (!in_array($fileExtension, $allowedExtensions)) {
+            return ['success' => false, 'error' => 'Formato de certificado inválido'];
+        }
+        
+        // Criar diretório de certificados se não existir
+        $uploadDir = __DIR__ . '/../uploads/certificates/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        // Gerar nome único para o arquivo
+        $fileName = uniqid() . '_' . time() . '.' . $fileExtension;
+        $filePath = $uploadDir . $fileName;
+        
+        // Mover arquivo para o diretório de destino
+        if (move_uploaded_file($file['tmp_name'], $filePath)) {
+            return ['success' => true, 'path' => 'uploads/certificates/' . $fileName];
+        } else {
+            return ['success' => false, 'error' => 'Erro ao salvar certificado'];
+        }
+    }
+
     /**
      * Gera um hash único para acesso ao documento
      */

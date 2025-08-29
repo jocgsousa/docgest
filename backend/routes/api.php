@@ -330,6 +330,8 @@ try {
                 case 'POST':
                     if ($id === null) {
                         $controller->store();
+                    } elseif ($id !== null && $action === 'sign') {
+                        $controller->signDocument($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }

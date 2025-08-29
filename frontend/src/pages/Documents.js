@@ -214,6 +214,8 @@ const Documents = ({ openCreateModal = false }) => {
     empresa_id: '', 
     filial_id: '', 
     assinantes: [],
+    solicitar_assinatura: false,
+    assinantes_solicitados: [],
     status: 'rascunho',
     tipo_documento_id: '',
     prazo_assinatura: '',
@@ -247,6 +249,14 @@ const Documents = ({ openCreateModal = false }) => {
   const [documentContent, setDocumentContent] = useState(null);
   const [loadingContent, setLoadingContent] = useState(false);
   const [documentTypes, setDocumentTypes] = useState([]);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [signingDocument, setSigningDocument] = useState(null);
+  const [signatureType, setSignatureType] = useState('eletronica');
+  const [signatureData, setSignatureData] = useState({
+    observacoes: '',
+    certificado: null
+  });
+  const [signingInProgress, setSigningInProgress] = useState(false);
 
   const statusOptions = [
     { value: '', label: 'Todos os status' },
@@ -326,6 +336,16 @@ const Documents = ({ openCreateModal = false }) => {
                 Excluir
               </Button>
             </>
+          )}
+          {user?.tipo_usuario === 3 && row.solicitar_assinatura && row.assinantes_solicitados && 
+           row.assinantes_solicitados.some(assinante => assinante.usuario_id === user?.id && assinante.status === 'pendente') && (
+            <Button
+              size="sm"
+              $variant="primary"
+              onClick={() => handleSign(row)}
+            >
+              Assinar
+            </Button>
           )}
         </div>
       )
@@ -484,6 +504,11 @@ const Documents = ({ openCreateModal = false }) => {
       if (formData.assinantes && formData.assinantes.length > 0) {
         submitData.append('assinantes', JSON.stringify(formData.assinantes));
       }
+      // Adicionar campos de solicitação de assinatura
+      submitData.append('solicitar_assinatura', formData.solicitar_assinatura ? '1' : '0');
+      if (formData.assinantes_solicitados && formData.assinantes_solicitados.length > 0) {
+        submitData.append('assinantes_solicitados', JSON.stringify(formData.assinantes_solicitados));
+      }
       if (formData.status) {
         submitData.append('status', formData.status);
       }
@@ -550,6 +575,9 @@ const Documents = ({ openCreateModal = false }) => {
       // Extrair IDs dos assinantes
       const assinantesIds = fullDocument.assinantes ? fullDocument.assinantes.map(a => a.usuario_id) : [];
       
+      // Extrair IDs dos assinantes solicitados
+      const assinantesSolicitadosIds = fullDocument.assinantes_solicitados ? fullDocument.assinantes_solicitados.map(a => a.usuario_id) : [];
+      
       setFormData({
         titulo: fullDocument.titulo,
         descricao: fullDocument.descricao || '',
@@ -557,6 +585,8 @@ const Documents = ({ openCreateModal = false }) => {
         empresa_id: fullDocument.empresa_id || '',
         filial_id: fullDocument.filial_id || '',
         assinantes: assinantesIds,
+        solicitar_assinatura: fullDocument.solicitar_assinatura || false,
+        assinantes_solicitados: assinantesSolicitadosIds,
         status: fullDocument.status || 'rascunho',
         tipo_documento_id: fullDocument.tipo_documento_id || '',
         prazo_assinatura: fullDocument.prazo_assinatura || '',
@@ -749,6 +779,60 @@ const Documents = ({ openCreateModal = false }) => {
     }
   };
 
+  const handleSign = (document) => {
+    setSigningDocument(document);
+    setShowSignModal(true);
+    setSignatureType('eletronica');
+    setSignatureData({
+      observacoes: '',
+      certificado: null
+    });
+  };
+
+  const handleCloseSignModal = () => {
+    setShowSignModal(false);
+    setSigningDocument(null);
+    setSignatureType('eletronica');
+    setSignatureData({
+      observacoes: '',
+      certificado: null
+    });
+  };
+
+  const handleSubmitSignature = async (e) => {
+    e.preventDefault();
+    
+    if (!signingDocument) return;
+    
+    try {
+      setSigningInProgress(true);
+      
+      const formData = new FormData();
+      formData.append('tipo_assinatura', signatureType);
+      formData.append('observacoes', signatureData.observacoes);
+      
+      if (signatureType === 'digital' && signatureData.certificado) {
+        formData.append('certificado', signatureData.certificado);
+      }
+      
+      await api.post(`/documents/${signingDocument.id}/sign`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      toast.success('Documento assinado com sucesso!');
+      handleCloseSignModal();
+      fetchDocuments(); // Recarregar a lista de documentos
+      
+    } catch (error) {
+      console.error('Erro ao assinar documento:', error);
+      toast.error(error.response?.data?.message || 'Erro ao assinar documento');
+    } finally {
+      setSigningInProgress(false);
+    }
+  };
+
   const resetForm = () => {
     const baseFormData = { 
       titulo: '', 
@@ -757,6 +841,8 @@ const Documents = ({ openCreateModal = false }) => {
       empresa_id: '', 
       filial_id: '', 
       assinantes: [],
+      solicitar_assinatura: false,
+      assinantes_solicitados: [],
       status: 'rascunho',
       tipo_documento_id: '',
       prazo_assinatura: '',
@@ -1127,8 +1213,132 @@ const Documents = ({ openCreateModal = false }) => {
             </div>
           </FormGrid>
 
-          {/* Campo de Assinantes - apenas para Admin e Administrador de Empresa */}
+          {/* Campo Solicitar Assinatura - apenas para Admin e Administrador de Empresa */}
           {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && (
+            <FormRow>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.solicitar_assinatura}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        solicitar_assinatura: e.target.checked,
+                        assinantes_solicitados: e.target.checked ? prev.assinantes_solicitados : []
+                      }));
+                    }}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  Solicitar Assinatura
+                </label>
+                {errors.solicitar_assinatura && (
+                  <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                    {errors.solicitar_assinatura[0]}
+                  </span>
+                )}
+              </div>
+            </FormRow>
+          )}
+
+          {/* Campo de Assinantes Solicitados - apenas quando solicitar_assinatura estiver marcado */}
+          {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && formData.solicitar_assinatura && (
+            <FormRow>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Selecionar Assinantes
+                </label>
+                <div style={{ 
+                  border: '1px solid #d1d5db', 
+                  borderRadius: '6px', 
+                  maxHeight: '150px', 
+                  overflowY: 'auto',
+                  padding: '8px'
+                }}>
+                  {loadingUsers ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                      Carregando usuários...
+                    </div>
+                  ) : availableUsers.length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                      {formData.empresa_id ? 'Nenhum usuário encontrado' : 'Selecione uma empresa primeiro'}
+                    </div>
+                  ) : (
+                    Array.isArray(availableUsers) && availableUsers.map(user => (
+                      <label key={user.id} style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        padding: '4px 0',
+                        cursor: 'pointer'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.assinantes_solicitados.includes(user.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData(prev => ({
+                                ...prev,
+                                assinantes_solicitados: [...prev.assinantes_solicitados, user.id]
+                              }));
+                            } else {
+                              setFormData(prev => ({
+                                ...prev,
+                                assinantes_solicitados: prev.assinantes_solicitados.filter(id => id !== user.id)
+                              }));
+                            }
+                          }}
+                        />
+                        <span style={{ fontSize: '14px' }}>
+                          {user.nome} ({user.email})
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {errors.assinantes_solicitados && (
+                  <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                    {errors.assinantes_solicitados[0]}
+                  </span>
+                )}
+              </div>
+            </FormRow>
+          )}
+
+          {/* Campo Prazo de Assinatura - aparece quando há assinantes solicitados */}
+          {(user?.tipo_usuario === 1 || user?.tipo_usuario === 2) && formData.solicitar_assinatura && formData.assinantes_solicitados && formData.assinantes_solicitados.length > 0 && (
+            <FormRow>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                  Prazo para Assinatura
+                </label>
+                <input
+                  type="date"
+                  value={formData.prazo_assinatura}
+                  onChange={(e) => setFormData(prev => ({ ...prev, prazo_assinatura: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                {errors.prazo_assinatura && (
+                  <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                    {errors.prazo_assinatura[0]}
+                  </span>
+                )}
+              </div>
+            </FormRow>
+          )}
+
+          {/* Campo de Assinantes - removido pois agora só aparece quando solicitar assinatura estiver marcado */}
+          {false && (
             <FormRow>
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
@@ -1373,6 +1583,106 @@ const Documents = ({ openCreateModal = false }) => {
           </ViewModalContent>
         </ViewModal>
       )}
+
+      {/* Modal de Assinatura */}
+      <Modal
+        isOpen={showSignModal}
+        onClose={handleCloseSignModal}
+        title={`Assinar Documento: ${signingDocument?.titulo || ''}`}
+      >
+        <form onSubmit={handleSubmitSignature}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+              Tipo de Assinatura
+            </label>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="signatureType"
+                  value="eletronica"
+                  checked={signatureType === 'eletronica'}
+                  onChange={(e) => setSignatureType(e.target.value)}
+                />
+                <span>Assinatura Eletrônica</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="signatureType"
+                  value="digital"
+                  checked={signatureType === 'digital'}
+                  onChange={(e) => setSignatureType(e.target.value)}
+                />
+                <span>Assinatura Digital</span>
+              </label>
+            </div>
+          </div>
+
+          {signatureType === 'digital' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                Certificado Digital *
+              </label>
+              <input
+                type="file"
+                accept=".p12,.pfx"
+                onChange={(e) => setSignatureData(prev => ({ ...prev, certificado: e.target.files[0] }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                required
+              />
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Selecione seu arquivo de certificado digital (.p12 ou .pfx)
+              </p>
+            </div>
+          )}
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+              Observações (opcional)
+            </label>
+            <textarea
+              value={signatureData.observacoes}
+              onChange={(e) => setSignatureData(prev => ({ ...prev, observacoes: e.target.value }))}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+              placeholder="Adicione observações sobre a assinatura (opcional)"
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <Button
+              type="button"
+              $variant="outline"
+              onClick={handleCloseSignModal}
+              disabled={signingInProgress}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              loading={signingInProgress}
+              disabled={signatureType === 'digital' && !signatureData.certificado}
+            >
+              Assinar Documento
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </PageContainer>
   );
 };
