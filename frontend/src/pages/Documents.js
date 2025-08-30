@@ -588,9 +588,8 @@ const Documents = ({ openCreateModal = false }) => {
       if (formData.validade_legal) {
         submitData.append('validade_legal', formData.validade_legal);
       }
-      if (formData.vinculado_a) {
-        submitData.append('vinculado_a', formData.vinculado_a);
-      }
+      // Sempre enviar vinculado_a, mesmo se vazio (para permitir "Nenhum usuário vinculado")
+      submitData.append('vinculado_a', formData.vinculado_a || '');
 
       if (editingDocument) {
         await api.put(`/documents/${editingDocument.id}`, submitData, {

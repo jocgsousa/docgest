@@ -33,7 +33,7 @@ class UserController {
             }
             
             // Excluir o usuário atual da listagem
-            $filters['exclude_user_id'] = $currentUser['user_id'];
+            $filters['exclude_user_id'] = $currentUser['id'];
             
             // Filtros opcionais
             if (isset($_GET['empresa_id']) && $currentUser['tipo_usuario'] == 1) {
@@ -316,7 +316,7 @@ class UserController {
             }
             
             // Não permitir que o usuário exclua a si mesmo
-            if ($user['id'] == $currentUser['user_id']) {
+            if ($user['id'] == $currentUser['id']) {
                 Response::error('Você não pode excluir sua própria conta', 400);
             }
             
@@ -580,7 +580,7 @@ class UserController {
             }
             
             // Não permitir desativar o próprio usuário
-            if ($user['id'] == $currentUser['user_id']) {
+            if ($user['id'] == $currentUser['id']) {
                 Response::error('Você não pode desativar seu próprio usuário', 400);
             }
             
@@ -646,7 +646,7 @@ class UserController {
             }
             
             // Não permitir excluir o próprio usuário
-            if ($user['id'] == $currentUser['user_id']) {
+            if ($user['id'] == $currentUser['id']) {
                 Response::error('Você não pode excluir seu próprio usuário', 400);
             }
             
@@ -703,7 +703,7 @@ class UserController {
             
             // Criar a solicitação
             $requestData = [
-                'usuario_solicitante_id' => $currentUser['user_id'],
+                'usuario_solicitante_id' => $currentUser['id'],
                 'usuario_alvo_id' => $data['usuario_id'],
                 'motivo' => $data['motivo'],
                 'detalhes' => $data['detalhes'] ?? null,
@@ -1253,7 +1253,7 @@ class UserController {
                 $empresaId,
                 $tipoUsuario,
                 $emailDestinatario,
-                $authUser['user_id'],
+                $authUser['id'],
                 $dataExpiracao
             ]);
             

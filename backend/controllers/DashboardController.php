@@ -44,7 +44,10 @@ class DashboardController {
                     'usuarios' => $this->userModel->count(),
                     'empresas' => $this->companyModel->count(),
                     'filiais' => $this->branchModel->count(),
-                    'documentos' => $this->documentModel->count(),
+                    'documentos' => $this->documentModel->countWithFilters([
+                        'user_id' => $currentUser['id'],
+                        'user_type' => $currentUser['tipo_usuario']
+                    ]),
                     'assinaturas' => $this->signatureModel->count(),
                     'pendentes' => $this->signatureModel->countPending(),
                     'usuarios_por_tipo' => $this->userModel->countByType(),
@@ -58,7 +61,11 @@ class DashboardController {
                 $stats = [
                     'usuarios' => $this->userModel->countByCompany($currentUser['empresa_id']),
                     'filiais' => $filiaisUsadas,
-                    'documentos' => $this->documentModel->countByCompany($currentUser['empresa_id']),
+                    'documentos' => $this->documentModel->countWithFilters([
+                         'user_id' => $currentUser['id'],
+                         'user_type' => $currentUser['tipo_usuario'],
+                         'empresa_id' => $currentUser['empresa_id']
+                     ]),
                     'assinaturas' => $this->signatureModel->countByCompany($currentUser['empresa_id']),
                     'pendentes' => $this->signatureModel->countPendingByCompany($currentUser['empresa_id']),
                     'plano' => [
@@ -77,20 +84,26 @@ class DashboardController {
                     ]
                 ];
             } else {
-                // Assinante - estatísticas pessoais
-                // Contar documentos criados pelo usuário + documentos onde ele é assinante + documentos solicitados para assinatura
-                $documentosCriados = $this->documentModel->countByUser($currentUser['user_id']);
-                $documentosAssinante = $this->documentAssinanteModel->countByUser($currentUser['user_id']);
-                $documentosSolicitados = $this->documentAssinanteSolicitadoModel->countByUser($currentUser['user_id']);
+                // Assinante - estatísticas pessoais com filtros aplicados
+                $totalDocumentos = $this->documentModel->countWithFilters([
+                     'user_id' => $currentUser['id'],
+                     'user_type' => $currentUser['tipo_usuario'],
+                     'empresa_id' => $currentUser['empresa_id'],
+                     'filial_id' => $currentUser['filial_id']
+                 ]);
                 
-                // Contar pendentes: assinaturas pendentes criadas pelo usuário + documentos pendentes onde ele é assinante + documentos pendentes solicitados
-                $assinaturasPendentes = $this->signatureModel->countPendingByUser($currentUser['user_id']);
-                $documentosPendentes = $this->documentAssinanteModel->countPendingByUser($currentUser['user_id']);
-                $documentosSolicitadosPendentes = $this->documentAssinanteSolicitadoModel->countPendingByUser($currentUser['user_id']);
-                
-                $stats = [
-                    'documentos' => $documentosCriados + $documentosAssinante + $documentosSolicitados,
-                    'assinaturas' => $this->signatureModel->countByUser($currentUser['user_id']),
+                // Contar documentos onde ele é assinante + documentos solicitados para assinatura
+                 $documentosAssinante = $this->documentAssinanteModel->countByUser($currentUser['id']);
+                 $documentosSolicitados = $this->documentAssinanteSolicitadoModel->countByUser($currentUser['id']);
+                 
+                 // Contar assinaturas e documentos pendentes
+                 $assinaturasPendentes = $this->signatureModel->countPendingByUser($currentUser['id']);
+                 $documentosPendentes = $this->documentAssinanteModel->countPendingByUser($currentUser['id']);
+                 $documentosSolicitadosPendentes = $this->documentAssinanteSolicitadoModel->countPendingByUser($currentUser['id']);
+                 
+                 $stats = [
+                     'documentos' => $totalDocumentos + $documentosAssinante + $documentosSolicitados,
+                     'assinaturas' => $this->signatureModel->countByUser($currentUser['id']),
                     'pendentes' => $assinaturasPendentes + $documentosPendentes + $documentosSolicitadosPendentes
                 ];
             }
@@ -119,7 +132,7 @@ class DashboardController {
                 $activities = $this->getCompanyActivities($currentUser['empresa_id']);
             } else {
                 // Assinante - atividades pessoais
-                $activities = $this->getUserActivities($currentUser['user_id']);
+                $activities = $this->getUserActivities($currentUser['id']);
             }
             
             Response::success($activities, 'Atividades recuperadas com sucesso');

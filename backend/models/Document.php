@@ -151,19 +151,63 @@ class Document {
             $params[':status'] = $filters['status'];
         }
         
-        if (!empty($filters['empresa_id'])) {
-            $conditions[] = 'd.empresa_id = :empresa_id';
-            $params[':empresa_id'] = $filters['empresa_id'];
-        }
-        
-        if (!empty($filters['filial_id'])) {
-            $conditions[] = 'd.filial_id = :filial_id';
-            $params[':filial_id'] = $filters['filial_id'];
-        }
-        
-        if (!empty($filters['criado_por'])) {
-            $conditions[] = 'd.criado_por = :criado_por';
-            $params[':criado_por'] = $filters['criado_por'];
+        // Aplicar regras de negócio baseadas no tipo de usuário
+        if (!empty($filters['user_id']) && !empty($filters['user_type'])) {
+            $userId = $filters['user_id'];
+            $userType = $filters['user_type'];
+            $empresaId = $filters['empresa_id'] ?? null;
+            $filialId = $filters['filial_id'] ?? null;
+            
+            if ($userType == 1) {
+                // Super Admin - pode ver todos os documentos
+                // Não adiciona filtros adicionais
+            } elseif ($userType == 2) {
+                // Admin da empresa - pode ver apenas documentos que ele publicou
+                $conditions[] = 'd.criado_por = :user_id';
+                $params[':user_id'] = $userId;
+            } elseif ($userType == 3) {
+                // Assinante - regras específicas
+                $accessConditions = [];
+                
+                // 1. Documentos vinculados ao usuário
+                $accessConditions[] = 'd.vinculado_a = :user_id';
+                
+                // 2. Documentos criados por ele
+                $accessConditions[] = 'd.criado_por = :user_id';
+                
+                // 3. Documentos com solicitação de assinatura para ele
+                $accessConditions[] = 'EXISTS (SELECT 1 FROM documento_assinantes_solicitados das WHERE das.documento_id = d.id AND das.usuario_id = :user_id AND das.ativo = 1)';
+                
+                $conditions[] = '(' . implode(' OR ', $accessConditions) . ')';
+                $params[':user_id'] = $userId;
+                
+                // Filtrar por empresa/filial
+                if ($empresaId) {
+                    $conditions[] = 'd.empresa_id = :empresa_id';
+                    $params[':empresa_id'] = $empresaId;
+                }
+                
+                if ($filialId) {
+                    $conditions[] = 'd.filial_id = :filial_id';
+                    $params[':filial_id'] = $filialId;
+                }
+            }
+        } else {
+            // Fallback para compatibilidade com código existente
+            if (!empty($filters['empresa_id'])) {
+                $conditions[] = 'd.empresa_id = :empresa_id';
+                $params[':empresa_id'] = $filters['empresa_id'];
+            }
+            
+            if (!empty($filters['filial_id'])) {
+                $conditions[] = 'd.filial_id = :filial_id';
+                $params[':filial_id'] = $filters['filial_id'];
+            }
+            
+            if (!empty($filters['criado_por'])) {
+                $conditions[] = 'd.criado_por = :criado_por';
+                $params[':criado_por'] = $filters['criado_por'];
+            }
         }
         
         if (!empty($filters['tipo_documento_id'])) {
@@ -232,7 +276,7 @@ class Document {
         }
 
         return [
-            'data' => $documents,
+            'items' => $documents,
             'total' => $total,
             'page' => $page,
             'pageSize' => $pageSize,
@@ -304,6 +348,94 @@ class Document {
         $sql = "SELECT COUNT(*) as total FROM {$this->table} WHERE criado_por = :criado_por AND ativo = 1";
         $stmt = $this->db->prepare($sql);
         $stmt->bindParam(':criado_por', $userId);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['total'];
+    }
+    
+    /**
+     * Conta documentos com filtros baseados no tipo de usuário
+     */
+    public function countWithFilters($filters = []) {
+        $conditions = ['d.ativo = 1'];
+        $params = [];
+        
+        if (!empty($filters['search'])) {
+            $conditions[] = '(d.titulo LIKE :search OR d.descricao LIKE :search)';
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+        
+        if (!empty($filters['status'])) {
+            $conditions[] = 'd.status = :status';
+            $params[':status'] = $filters['status'];
+        }
+        
+        // Aplicar regras de negócio baseadas no tipo de usuário
+        if (!empty($filters['user_id']) && !empty($filters['user_type'])) {
+            $userId = $filters['user_id'];
+            $userType = $filters['user_type'];
+            $empresaId = $filters['empresa_id'] ?? null;
+            $filialId = $filters['filial_id'] ?? null;
+            
+            if ($userType == 1) {
+                // Super Admin - pode ver todos os documentos
+                // Não adiciona filtros adicionais
+            } elseif ($userType == 2) {
+                // Admin da empresa - pode ver apenas documentos que ele publicou
+                $conditions[] = 'd.criado_por = :user_id';
+                $params[':user_id'] = $userId;
+            } elseif ($userType == 3) {
+                // Assinante - regras específicas
+                $accessConditions = [];
+                
+                // 1. Documentos vinculados ao usuário
+                $accessConditions[] = 'd.vinculado_a = :user_id';
+                
+                // 2. Documentos criados por ele
+                $accessConditions[] = 'd.criado_por = :user_id';
+                
+                // 3. Documentos com solicitação de assinatura para ele
+                $accessConditions[] = 'EXISTS (SELECT 1 FROM documento_assinantes_solicitados das WHERE das.documento_id = d.id AND das.usuario_id = :user_id AND das.ativo = 1)';
+                
+                $conditions[] = '(' . implode(' OR ', $accessConditions) . ')';
+                $params[':user_id'] = $userId;
+                
+                // Filtrar por empresa/filial
+                if ($empresaId) {
+                    $conditions[] = 'd.empresa_id = :empresa_id';
+                    $params[':empresa_id'] = $empresaId;
+                }
+                
+                if ($filialId) {
+                    $conditions[] = 'd.filial_id = :filial_id';
+                    $params[':filial_id'] = $filialId;
+                }
+            }
+        } else {
+            // Fallback para compatibilidade com código existente
+            if (!empty($filters['empresa_id'])) {
+                $conditions[] = 'd.empresa_id = :empresa_id';
+                $params[':empresa_id'] = $filters['empresa_id'];
+            }
+            
+            if (!empty($filters['criado_por'])) {
+                $conditions[] = 'd.criado_por = :criado_por';
+                $params[':criado_por'] = $filters['criado_por'];
+            }
+        }
+        
+        if (!empty($filters['tipo_documento_id'])) {
+            $conditions[] = 'd.tipo_documento_id = :tipo_documento_id';
+            $params[':tipo_documento_id'] = $filters['tipo_documento_id'];
+        }
+        
+        $whereClause = implode(' AND ', $conditions);
+        
+        $sql = "SELECT COUNT(*) as total FROM {$this->table} d WHERE {$whereClause}";
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
         $stmt->execute();
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result['total'];

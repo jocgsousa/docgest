@@ -24,12 +24,12 @@ class NotificationController {
             $offset = ($page - 1) * $pageSize;
             
             $notifications = $this->notificationModel->listByUser(
-                $currentUser['user_id'], 
+                $currentUser['id'], 
                 $pageSize, 
                 $offset
             );
             
-            $unreadCount = $this->notificationModel->countUnreadByUser($currentUser['user_id']);
+            $unreadCount = $this->notificationModel->countUnreadByUser($currentUser['id']);
             
             Response::success([
                 'notifications' => $notifications,
@@ -50,7 +50,7 @@ class NotificationController {
         try {
             $currentUser = JWT::requireAuth();
             
-            $count = $this->notificationModel->countUnreadByUser($currentUser['user_id']);
+            $count = $this->notificationModel->countUnreadByUser($currentUser['id']);
             
             Response::success(['count' => $count]);
             
@@ -71,7 +71,7 @@ class NotificationController {
                 return;
             }
             
-            $result = $this->notificationModel->markAsRead($id, $currentUser['user_id']);
+            $result = $this->notificationModel->markAsRead($id, $currentUser['id']);
             
             if ($result) {
                 Response::success(['message' => 'Notificação marcada como lida']);
@@ -91,7 +91,7 @@ class NotificationController {
         try {
             $currentUser = JWT::requireAuth();
             
-            $result = $this->notificationModel->markAllAsRead($currentUser['user_id']);
+            $result = $this->notificationModel->markAllAsRead($currentUser['id']);
             
             if ($result) {
                 Response::success(['message' => 'Todas as notificações foram marcadas como lidas']);
@@ -135,7 +135,7 @@ class NotificationController {
                 'titulo' => $input['titulo'],
                 'mensagem' => $input['mensagem'],
                 'tipo' => $input['tipo'],
-                'usuario_remetente_id' => $currentUser['user_id']
+                'usuario_remetente_id' => $currentUser['id']
             ];
             
             // Determinar destinatários baseado no tipo de usuário e parâmetros
@@ -212,14 +212,14 @@ class NotificationController {
             }
             
             // Verificar se o usuário pode ver esta notificação
-            if ($notification['usuario_destinatario_id'] != $currentUser['user_id']) {
+            if ($notification['usuario_destinatario_id'] != $currentUser['id']) {
                 Response::error('Acesso negado', 403);
                 return;
             }
             
             // Marcar como lida automaticamente
             if (!$notification['lida']) {
-                $this->notificationModel->markAsRead($id, $currentUser['user_id']);
+                $this->notificationModel->markAsRead($id, $currentUser['id']);
                 $notification['lida'] = 1;
                 $notification['data_leitura'] = date('Y-m-d H:i:s');
             }
@@ -243,7 +243,7 @@ class NotificationController {
                 return;
             }
             
-            $result = $this->notificationModel->delete($id, $currentUser['user_id']);
+            $result = $this->notificationModel->delete($id, $currentUser['id']);
             
             if ($result) {
                 Response::success(['message' => 'Notificação removida com sucesso']);

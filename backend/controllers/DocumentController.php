@@ -96,19 +96,18 @@ class DocumentController {
                 $filters['status'] = $_GET['status'];
             }
             
-            // Filtrar por empresa/filial baseado no tipo de usuário
-            if ($user['tipo_usuario'] == 2) { // Admin da empresa
-                $filters['empresa_id'] = $user['empresa_id'];
-            } elseif ($user['tipo_usuario'] == 3) { // Assinante
-                $filters['empresa_id'] = $user['empresa_id'];
-                if ($user['filial_id']) {
-                    $filters['filial_id'] = $user['filial_id'];
-                }
+            // Aplicar filtros baseados no tipo de usuário e regras de negócio
+            $filters['user_id'] = $user['id'];
+            $filters['user_type'] = $user['tipo_usuario'];
+            $filters['empresa_id'] = $user['empresa_id'];
+            
+            if ($user['filial_id']) {
+                $filters['filial_id'] = $user['filial_id'];
             }
             
             $result = $this->document->findAll($filters, $page, $pageSize);
             
-            Response::paginated($result['data'], $result['total'], $page, $pageSize);
+            Response::paginated($result['items'], $result['total'], $page, $pageSize);
         } catch (Exception $e) {
             Response::error('Erro ao buscar documentos: ' . $e->getMessage());
         }
@@ -260,6 +259,13 @@ class DocumentController {
                 return;
             }
             
+            // Validar se o array $user contém a chave 'id'
+            if (!isset($user['id'])) {
+                error_log("[ERROR] DocumentController::store - Chave 'id' não encontrada no array \$user: " . print_r($user, true));
+                Response::error('Erro interno: dados do usuário inválidos', 500);
+                return;
+            }
+            
             // Preparar dados para salvar
             $documentData = [
                 'titulo' => $data['titulo'],
@@ -270,7 +276,7 @@ class DocumentController {
                 'tipo_arquivo' => $file['type'],
                 'status' => $data['status'],
                 'solicitar_assinatura' => $data['solicitar_assinatura'],
-                'criado_por' => $user['user_id'],
+                'criado_por' => $user['id'],
                 'empresa_id' => $data['empresa_id'],
                 'filial_id' => $data['filial_id'],
                 'tipo_documento_id' => $data['tipo_documento_id'],
@@ -389,7 +395,7 @@ class DocumentController {
             }
             
             if ($user['tipo_usuario'] == 3) {
-                if ($document['criado_por'] != $user['user_id']) {
+                if ($document['criado_por'] != $user['id']) {
                     Response::forbidden('Acesso negado');
                     return;
                 }
@@ -411,7 +417,7 @@ class DocumentController {
                 'prazo_assinatura' => isset($_POST['prazo_assinatura']) ? $_POST['prazo_assinatura'] : $document['prazo_assinatura'],
                 'competencia' => isset($_POST['competencia']) ? $this->formatCompetenciaDate($_POST['competencia']) : $document['competencia'],
                 'validade_legal' => isset($_POST['validade_legal']) ? $_POST['validade_legal'] : $document['validade_legal'],
-                'vinculado_a' => isset($_POST['vinculado_a']) && !empty($_POST['vinculado_a']) ? $_POST['vinculado_a'] : $document['vinculado_a']
+                'vinculado_a' => isset($_POST['vinculado_a']) ? (empty($_POST['vinculado_a']) ? null : $_POST['vinculado_a']) : $document['vinculado_a']
             ];
             
             if (!$this->validator->validate($data, $rules)) {
@@ -605,7 +611,7 @@ class DocumentController {
             }
             
             if ($user['tipo_usuario'] == 3) {
-                if ($document['criado_por'] != $user['user_id']) {
+                if ($document['criado_por'] != $user['id']) {
                     Response::forbidden('Acesso negado');
                     return;
                 }
@@ -795,7 +801,7 @@ class DocumentController {
             }
             
             if ($user['tipo_usuario'] == 3) {
-                if ($document['criado_por'] != $user['user_id']) {
+                if ($document['criado_por'] != $user['id']) {
                     Response::forbidden('Acesso negado');
                     return;
                 }
@@ -912,7 +918,7 @@ class DocumentController {
             // Verificar se o usuário está na lista de assinantes do documento
             if (isset($document['assinantes']) && is_array($document['assinantes'])) {
                 foreach ($document['assinantes'] as $assinante) {
-                    if ($assinante['usuario_id'] == $user['user_id']) {
+                    if ($assinante['usuario_id'] == $user['id']) {
                         return true;
                     }
                 }
@@ -1026,7 +1032,7 @@ class DocumentController {
             }
             
             // Verificar se o usuário está na lista de assinantes solicitados
-            $assinanteSolicitado = $this->documentAssinanteSolicitado->findByDocumentAndUser($documentoId, $user['user_id']);
+            $assinanteSolicitado = $this->documentAssinanteSolicitado->findByDocumentAndUser($documentoId, $user['id']);
             if (!$assinanteSolicitado) {
                 Response::forbidden('Você não está autorizado a assinar este documento');
                 return;
@@ -1157,7 +1163,7 @@ class DocumentController {
             }
             
             // Salvar assinatura eletrônica
-            $saveResult = $this->saveElectronicSignature($signatureInfo, $document['id'], $user['user_id'], $positionData);
+            $saveResult = $this->saveElectronicSignature($signatureInfo, $document['id'], $user['id'], $positionData);
             if (!$saveResult['success']) {
                 return ['success' => false, 'error' => $saveResult['error']];
             }
@@ -1254,9 +1260,9 @@ class DocumentController {
             }
             
             // Buscar dados completos do usuário (necessário para ambos os tipos de arquivo)
-            error_log('DEBUG: Buscando dados do usuário ID: ' . $user['user_id']);
+            error_log('DEBUG: Buscando dados do usuário ID: ' . $user['id']);
             $userModel = new User();
-            $fullUser = $userModel->findById($user['user_id']);
+            $fullUser = $userModel->findById($user['id']);
             error_log('DEBUG: Dados do usuário encontrados: ' . ($fullUser ? 'sim' : 'não'));
             
             // Verificar se é um PDF (mais comum para assinatura digital)
@@ -1270,7 +1276,7 @@ class DocumentController {
                     'signer_certificate_issuer' => $certificateInfo['issuer'],
                     'signature_date' => date('Y-m-d H:i:s'),
                     'certificate_serial' => $certificateInfo['serial_number'],
-                    'user_id' => $user['user_id'],
+                    'user_id' => $user['id'],
                     'user_name' => $fullUser['nome'] ?? 'Usuário não encontrado'
                 ];
                 
@@ -1309,7 +1315,7 @@ class DocumentController {
                     'signer_certificate_issuer' => $certificateInfo['issuer'],
                     'signature_date' => date('Y-m-d H:i:s'),
                     'certificate_serial' => $certificateInfo['serial_number'],
-                    'user_id' => $user['user_id'],
+                    'user_id' => $user['id'],
                     'user_name' => $fullUser['nome'] ?? 'Usuário não encontrado',
                     'document_hash' => hash_file('sha256', $documentPath)
                 ];
@@ -1621,12 +1627,12 @@ class DocumentController {
             }
             
             // Gerar hash da assinatura (simulado)
-            $signatureHash = hash('sha256', $document['id'] . $user['user_id'] . time() . $certificateData['thumbprint']);
+            $signatureHash = hash('sha256', $document['id'] . $user['id'] . time() . $certificateData['thumbprint']);
             
             // Criar metadados da assinatura
             $signatureMetadata = [
                 'timestamp' => date('Y-m-d H:i:s'),
-                'user_id' => $user['user_id'],
+                'user_id' => $user['id'],
                 'document_id' => $document['id'],
                 'certificate_thumbprint' => $certificateData['thumbprint'],
                 'signature_hash' => $signatureHash,

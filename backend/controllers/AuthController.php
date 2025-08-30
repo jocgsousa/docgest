@@ -170,7 +170,7 @@ class AuthController {
         try {
             $currentUser = JWT::requireAuth();
             
-            $user = $this->userModel->findById($currentUser['user_id']);
+            $user = $this->userModel->findById($currentUser['id']);
             
             if (!$user) {
                 Response::notFound('Usuário não encontrado');
@@ -218,12 +218,12 @@ class AuthController {
             
             if (isset($input['email'])) {
                 $validator->email('email', 'Email deve ser válido')
-                         ->unique('email', 'usuarios', 'email', $currentUser['user_id'], 'Este email já está em uso');
+                         ->unique('email', 'usuarios', 'email', $currentUser['id'], 'Este email já está em uso');
             }
             
             if (isset($input['cpf'])) {
                 $validator->cpf('cpf', 'CPF deve ser válido')
-                         ->unique('cpf', 'usuarios', 'cpf', $currentUser['user_id'], 'Este CPF já está em uso');
+                         ->unique('cpf', 'usuarios', 'cpf', $currentUser['id'], 'Este CPF já está em uso');
             }
             
             if (isset($input['senha'])) {
@@ -247,7 +247,7 @@ class AuthController {
                 }
             }
             
-            $user = $this->userModel->update($currentUser['user_id'], $updateData);
+            $user = $this->userModel->update($currentUser['id'], $updateData);
             
             if (!$user) {
                 Response::error('Erro ao atualizar perfil', 500);
@@ -281,7 +281,7 @@ class AuthController {
 
             
             // Buscar usuário
-            $user = $this->userModel->findById($currentUser['user_id']);
+            $user = $this->userModel->findById($currentUser['id']);
             
             if (!$user) {
                 Response::notFound('Usuário não encontrado');
@@ -293,7 +293,7 @@ class AuthController {
             }
             
             // Atualizar senha
-            $updated = $this->userModel->update($currentUser['user_id'], [
+            $updated = $this->userModel->update($currentUser['id'], [
                 'senha' => $input['nova_senha']
             ]);
             

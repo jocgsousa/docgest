@@ -61,7 +61,7 @@ class JWT {
      */
     public static function generateUserToken($user) {
         $payload = [
-            'user_id' => $user['id'],
+            'id' => $user['id'],
             'email' => $user['email'],
             'tipo_usuario' => $user['tipo_usuario'],
             'empresa_id' => $user['empresa_id'],

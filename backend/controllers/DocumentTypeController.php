@@ -30,7 +30,7 @@ class DocumentTypeController {
                 $limit, 
                 $search, 
                 $status,
-                $user['user_id'],
+                $user['id'],
                 $user['tipo_usuario'],
                 $user['empresa_id']
             );
@@ -97,7 +97,7 @@ class DocumentTypeController {
                 'nome' => trim($requestData['nome'] ?? ''),
                 'descricao' => trim($requestData['descricao'] ?? ''),
                 'ativo' => isset($requestData['ativo']) ? (bool)$requestData['ativo'] : true,
-                'criado_por' => $user['user_id'],
+                'criado_por' => $user['id'],
                 'empresa_id' => $user['tipo_usuario'] == 1 ? null : $user['empresa_id'] // Super Admin cria global, outros criam para sua empresa
             ];
             
@@ -148,7 +148,7 @@ class DocumentTypeController {
             }
             
             // Verificar permissão de edição
-            if (!$this->documentType->canEdit($id, $user['user_id'], $user['tipo_usuario'], $user['empresa_id'])) {
+            if (!$this->documentType->canEdit($id, $user['id'], $user['tipo_usuario'], $user['empresa_id'])) {
                 Response::forbidden('Você não tem permissão para editar este tipo de documento');
                 return;
             }
@@ -225,7 +225,7 @@ class DocumentTypeController {
             }
             
             // Verificar permissão de exclusão
-            if (!$this->documentType->canDelete($id, $user['user_id'], $user['tipo_usuario'], $user['empresa_id'])) {
+            if (!$this->documentType->canDelete($id, $user['id'], $user['tipo_usuario'], $user['empresa_id'])) {
                 Response::forbidden('Você não tem permissão para excluir este tipo de documento');
                 return;
             }
@@ -254,7 +254,7 @@ class DocumentTypeController {
             
             // Buscar apenas tipos de documentos ativos com filtros de permissão
             $documentTypes = $this->documentType->getActiveTypes(
-                $user['user_id'],
+                $user['id'],
                 $user['tipo_usuario'],
                 $user['empresa_id']
             );
