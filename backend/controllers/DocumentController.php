@@ -1468,7 +1468,7 @@ class DocumentController {
             $signatureFilePath = $signaturesDir . $signatureFileName;
             
             // Processar dados da assinatura baseado no tipo
-            if (isset($signatureInfo['type']) && $signatureInfo['type'] === 'drawn') {
+            if (isset($signatureInfo['type']) && $signatureInfo['type'] === 'draw') {
                 // Assinatura desenhada (canvas)
                 $imageData = $signatureInfo['data'];
                 
@@ -1483,14 +1483,14 @@ class DocumentController {
                     return [
                         'success' => true,
                         'path' => 'uploads/signatures/' . $signatureFileName,
-                        'type' => 'drawn'
+                        'type' => 'draw'
                     ];
                 }
-            } elseif (isset($signatureInfo['type']) && $signatureInfo['type'] === 'typed') {
+            } elseif (isset($signatureInfo['type']) && $signatureInfo['type'] === 'type') {
                 // Assinatura digitada (texto com fonte)
-                $text = $signatureInfo['text'] ?? '';
+                $text = $signatureInfo['data'] ?? '';
                 $font = $signatureInfo['font'] ?? 'Arial';
-                $fontSize = $signatureInfo['fontSize'] ?? 24;
+                $fontSize = 24;
                 
                 // Criar imagem da assinatura digitada
                 $imageCreated = $this->createTypedSignatureImage($text, $font, $fontSize, $signatureFilePath);
@@ -1499,7 +1499,7 @@ class DocumentController {
                     return [
                         'success' => true,
                         'path' => 'uploads/signatures/' . $signatureFileName,
-                        'type' => 'typed',
+                        'type' => 'type',
                         'text' => $text,
                         'font' => $font
                     ];
@@ -1518,26 +1518,33 @@ class DocumentController {
      */
     private function createTypedSignatureImage($text, $font, $fontSize, $outputPath) {
         try {
-            // Dimensões da imagem
-            $width = 400;
+            // Dimensões da imagem baseadas no texto
+            $textLength = strlen($text);
+            $width = max(400, $textLength * 15); // Largura dinâmica baseada no texto
             $height = 100;
             
-            // Criar imagem
-            $image = imagecreate($width, $height);
+            // Criar imagem com fundo transparente
+            $image = imagecreatetruecolor($width, $height);
             
-            // Definir cores
-            $backgroundColor = imagecolorallocate($image, 255, 255, 255); // Branco
+            // Definir transparência
+            imagesavealpha($image, true);
+            $transparent = imagecolorallocatealpha($image, 0, 0, 0, 127);
+            imagefill($image, 0, 0, $transparent);
+            
+            // Definir cor do texto
             $textColor = imagecolorallocate($image, 0, 0, 0); // Preto
             
+            // Usar fonte padrão do sistema (mais legível)
+            $fontSizeGD = 5; // Tamanho máximo da fonte padrão GD
+            
+            // Calcular posição centralizada
+            $textWidth = imagefontwidth($fontSizeGD) * $textLength;
+            $textHeight = imagefontheight($fontSizeGD);
+            $x = ($width - $textWidth) / 2;
+            $y = ($height - $textHeight) / 2;
+            
             // Adicionar texto
-            $fontPath = $this->getFontPath($font);
-            if ($fontPath && function_exists('imagettftext')) {
-                // Usar fonte TTF se disponível
-                imagettftext($image, $fontSize, 0, 20, 60, $textColor, $fontPath, $text);
-            } else {
-                // Usar fonte padrão
-                imagestring($image, 5, 20, 30, $text, $textColor);
-            }
+            imagestring($image, $fontSizeGD, $x, $y, $text, $textColor);
             
             // Salvar imagem
             $result = imagepng($image, $outputPath);
@@ -1546,6 +1553,7 @@ class DocumentController {
             return $result;
             
         } catch (Exception $e) {
+            error_log('Erro ao criar imagem de assinatura digitada: ' . $e->getMessage());
             return false;
         }
     }

@@ -205,6 +205,8 @@ const DownloadMessage = styled.div`
 
 const Documents = ({ openCreateModal = false }) => {
   const { user } = useAuth();
+  
+
   const [documents, setDocuments] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -351,8 +353,33 @@ const Documents = ({ openCreateModal = false }) => {
               </Button>
             </>
           )}
-          {user?.tipo_usuario === 3 && row.solicitar_assinatura === true && row.assinantes_solicitados && 
-           row.assinantes_solicitados.some(assinante => assinante.usuario_id === user?.id && assinante.status === 'pendente') && (
+          {(() => {
+            // Verificar se é usuário assinante (tipo 3)
+            const isAssinante = Number(user?.tipo_usuario) === 3;
+            
+            // Verificar se o documento solicita assinatura
+            const solicitaAssinatura = Boolean(row.solicitar_assinatura);
+            
+            // Verificar se há assinantes solicitados
+            const temAssinantes = Array.isArray(row.assinantes_solicitados) && row.assinantes_solicitados.length > 0;
+            
+            // Verificar se o usuário atual está na lista de assinantes pendentes
+            let usuarioNaLista = false;
+            if (temAssinantes && user?.id) {
+              usuarioNaLista = row.assinantes_solicitados.some(assinante => 
+                Number(assinante.usuario_id) === Number(user.id) && assinante.status === 'pendente'
+              );
+            }
+            
+            const mostrarBotao = isAssinante && solicitaAssinatura && temAssinantes && usuarioNaLista;
+            
+            // Log de depuração simplificado
+            if (isAssinante) {
+              console.log(`Botão Assinar - Doc: ${row.titulo}, Usuário: ${user?.id}, Mostrar: ${mostrarBotao}`);
+            }
+            
+            return mostrarBotao;
+          })() && (
             <Button
               size="sm"
               $variant="primary"
@@ -423,7 +450,9 @@ const Documents = ({ openCreateModal = false }) => {
       });
       
       const response = await api.get(`/documents?${params}`);
-      setDocuments(response.data.data?.items || []);
+      const docs = response.data.data?.items || [];
+
+      setDocuments(docs);
       setPagination(prev => ({
         ...prev,
         total: response.data.data?.pagination?.total || 0

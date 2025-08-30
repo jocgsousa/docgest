@@ -51,6 +51,20 @@ class AuthController {
             // Remover senha dos dados do usuário
             unset($user['senha']);
             
+            // Converter campos numéricos para inteiros
+            if (isset($user['id'])) {
+                $user['id'] = (int) $user['id'];
+            }
+            if (isset($user['tipo_usuario'])) {
+                $user['tipo_usuario'] = (int) $user['tipo_usuario'];
+            }
+            if (isset($user['empresa_id'])) {
+                $user['empresa_id'] = (int) $user['empresa_id'];
+            }
+            if (isset($user['filial_id'])) {
+                $user['filial_id'] = (int) $user['filial_id'];
+            }
+            
             Response::success([
                 'user' => $user,
                 'token' => $token
@@ -164,6 +178,20 @@ class AuthController {
             
             // Remover senha
             unset($user['senha']);
+            
+            // Converter campos numéricos para inteiros
+            if (isset($user['id'])) {
+                $user['id'] = (int) $user['id'];
+            }
+            if (isset($user['tipo_usuario'])) {
+                $user['tipo_usuario'] = (int) $user['tipo_usuario'];
+            }
+            if (isset($user['empresa_id'])) {
+                $user['empresa_id'] = (int) $user['empresa_id'];
+            }
+            if (isset($user['filial_id'])) {
+                $user['filial_id'] = (int) $user['filial_id'];
+            }
             
             Response::success($user, 'Dados do usuário recuperados com sucesso');
             
