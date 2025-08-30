@@ -128,6 +128,8 @@ try {
                         $controller->stats();
                     } elseif ($id === 'by-company-branch') {
                         $controller->getByCompanyAndBranch();
+                    } elseif ($id === 'for-document-binding') {
+                        $controller->getForDocumentBinding();
                     } elseif ($id === 'requests') {
                         $controller->listRequests();
                     } elseif ($action === null) {
@@ -382,6 +384,8 @@ try {
                 case 'POST':
                     if ($id === null) {
                         $controller->store();
+                    } elseif ($id !== null && $action === 'sign') {
+                        $controller->signDocument($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }
@@ -434,6 +438,8 @@ try {
                 case 'POST':
                     if ($id === null) {
                         $controller->store();
+                    } elseif ($id !== null && $action === 'sign') {
+                        $controller->signDocument($id);
                     } else {
                         Response::notFound('Endpoint não encontrado');
                     }

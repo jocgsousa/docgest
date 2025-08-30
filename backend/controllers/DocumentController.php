@@ -4,6 +4,7 @@ require_once __DIR__ . '/../models/Document.php';
 require_once __DIR__ . '/../models/DocumentAssinante.php';
 require_once __DIR__ . '/../models/DocumentAssinanteSolicitado.php';
 require_once __DIR__ . '/../models/Settings.php';
+require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../utils/Response.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/../utils/JWT.php';
@@ -166,7 +167,7 @@ class DocumentController {
                 'status' => $_POST['status'] ?? 'rascunho',
                 'tipo_documento_id' => $_POST['tipo_documento_id'] ?? null,
                 'prazo_assinatura' => $_POST['prazo_assinatura'] ?? null,
-                'competencia' => $_POST['competencia'] ?? null,
+                'competencia' => $this->formatCompetenciaDate($_POST['competencia'] ?? null),
                 'validade_legal' => $_POST['validade_legal'] ?? null
             ];
             
@@ -274,8 +275,9 @@ class DocumentController {
                 'filial_id' => $data['filial_id'],
                 'tipo_documento_id' => $data['tipo_documento_id'],
                 'prazo_assinatura' => $data['prazo_assinatura'],
-                'competencia' => $data['competencia'],
-                'validade_legal' => $data['validade_legal']
+                'competencia' => $this->formatCompetenciaDate($data['competencia']),
+                'validade_legal' => $data['validade_legal'],
+                'vinculado_a' => isset($data['vinculado_a']) && !empty($data['vinculado_a']) ? $data['vinculado_a'] : null
             ];
             
             // Remove campos nulos para evitar erros de constraint
@@ -407,8 +409,9 @@ class DocumentController {
                 'status' => isset($_POST['status']) ? $_POST['status'] : $document['status'],
                 'tipo_documento_id' => isset($_POST['tipo_documento_id']) ? $_POST['tipo_documento_id'] : $document['tipo_documento_id'],
                 'prazo_assinatura' => isset($_POST['prazo_assinatura']) ? $_POST['prazo_assinatura'] : $document['prazo_assinatura'],
-                'competencia' => isset($_POST['competencia']) ? $_POST['competencia'] : $document['competencia'],
-                'validade_legal' => isset($_POST['validade_legal']) ? $_POST['validade_legal'] : $document['validade_legal']
+                'competencia' => isset($_POST['competencia']) ? $this->formatCompetenciaDate($_POST['competencia']) : $document['competencia'],
+                'validade_legal' => isset($_POST['validade_legal']) ? $_POST['validade_legal'] : $document['validade_legal'],
+                'vinculado_a' => isset($_POST['vinculado_a']) && !empty($_POST['vinculado_a']) ? $_POST['vinculado_a'] : $document['vinculado_a']
             ];
             
             if (!$this->validator->validate($data, $rules)) {
@@ -433,6 +436,7 @@ class DocumentController {
                 'prazo_assinatura' => $data['prazo_assinatura'],
                 'competencia' => $data['competencia'],
                 'validade_legal' => $data['validade_legal'],
+                'vinculado_a' => $data['vinculado_a'],
                 'solicitar_assinatura' => isset($_POST['solicitar_assinatura']) ? (bool)$_POST['solicitar_assinatura'] : $document['solicitar_assinatura']
             ];
             
@@ -500,9 +504,15 @@ class DocumentController {
                 }
             }
             
-            // Validar que usuários assinantes não podem definir assinantes ou solicitar assinatura
-            if ($user['tipo_usuario'] == 3 && (isset($_POST['assinantes']) && !empty($_POST['assinantes']) || isset($_POST['solicitar_assinatura']) && $_POST['solicitar_assinatura'])) {
-                Response::forbidden('Usuários assinantes não podem definir assinantes ou solicitar assinatura para documentos');
+            // Validar que usuários assinantes não podem definir assinantes
+            if ($user['tipo_usuario'] == 3 && isset($_POST['assinantes']) && !empty($_POST['assinantes'])) {
+                Response::forbidden('Usuários assinantes não podem definir assinantes para documentos');
+                return;
+            }
+            
+            // Validar que usuários assinantes não podem alterar solicitar_assinatura para verdadeiro
+            if ($user['tipo_usuario'] == 3 && isset($_POST['solicitar_assinatura']) && $_POST['solicitar_assinatura'] && !$document['solicitar_assinatura']) {
+                Response::forbidden('Usuários assinantes não podem solicitar assinatura para documentos');
                 return;
             }
             
@@ -902,7 +912,7 @@ class DocumentController {
             // Verificar se o usuário está na lista de assinantes do documento
             if (isset($document['assinantes']) && is_array($document['assinantes'])) {
                 foreach ($document['assinantes'] as $assinante) {
-                    if ($assinante['usuario_id'] == $user['id']) {
+                    if ($assinante['usuario_id'] == $user['user_id']) {
                         return true;
                     }
                 }
@@ -932,7 +942,7 @@ class DocumentController {
     /**
      * Processa assinatura de documento solicitado
      */
-    public function signDocument() {
+    public function signDocument($documentoId) {
         try {
             $user = JWT::requireAuth();
             
@@ -942,25 +952,65 @@ class DocumentController {
                 return;
             }
             
-            $input = json_decode(file_get_contents('php://input'), true);
+            // Processar dados do FormData
+            $tipoAssinatura = $_POST['tipo_assinatura'] ?? '';
+            $observacoes = $_POST['observacoes'] ?? '';
+            $posicaoX = $_POST['posicao_x'] ?? null;
+            $posicaoY = $_POST['posicao_y'] ?? null;
+            $pagina = $_POST['pagina'] ?? 1;
             
             // Validar dados obrigatórios
             $errors = [];
-            if (empty($input['documento_id'])) {
+            if (empty($documentoId)) {
                 $errors['documento_id'] = ['ID do documento é obrigatório'];
             }
-            if (empty($input['tipo_assinatura']) || !in_array($input['tipo_assinatura'], ['eletronica', 'digital'])) {
+            if (empty($tipoAssinatura) || !in_array($tipoAssinatura, ['eletronica', 'digital'])) {
                 $errors['tipo_assinatura'] = ['Tipo de assinatura inválido'];
+            }
+            
+            // Validar coordenadas de posição
+            if ($posicaoX === null || $posicaoY === null) {
+                $errors['posicao'] = ['Posição da assinatura é obrigatória'];
+            } elseif (!is_numeric($posicaoX) || !is_numeric($posicaoY) || $posicaoX < 0 || $posicaoY < 0) {
+                $errors['posicao'] = ['Coordenadas de posição inválidas'];
+            }
+            
+            if (!is_numeric($pagina) || $pagina < 1) {
+                $errors['pagina'] = ['Número da página inválido'];
+            }
+            
+            // Validações específicas por tipo de assinatura
+            if ($tipoAssinatura === 'eletronica') {
+                $assinaturaData = $_POST['assinatura_data'] ?? '';
+                if (empty($assinaturaData)) {
+                    $errors['assinatura_data'] = ['Dados da assinatura eletrônica são obrigatórios'];
+                }
+            } elseif ($tipoAssinatura === 'digital') {
+                $tipoCertificado = $_POST['tipo_certificado'] ?? 'arquivo';
+                $senha_certificado = $_POST['senha_certificado'] ?? '';
+                
+                if (empty($senha_certificado)) {
+                    $errors['senha_certificado'] = ['Senha do certificado é obrigatória'];
+                }
+                
+                if ($tipoCertificado === 'arquivo') {
+                    if (!isset($_FILES['certificado']) || $_FILES['certificado']['error'] !== UPLOAD_ERR_OK) {
+                        $errors['certificado'] = ['Certificado digital é obrigatório'];
+                    }
+                } elseif ($tipoCertificado === 'instalado') {
+                    $certificadoInstalado = $_POST['certificado_instalado'] ?? '';
+                    if (empty($certificadoInstalado)) {
+                        $errors['certificado_instalado'] = ['Certificado instalado é obrigatório'];
+                    }
+                } else {
+                    $errors['tipo_certificado'] = ['Tipo de certificado inválido'];
+                }
             }
             
             if (!empty($errors)) {
                 Response::validation($errors);
                 return;
             }
-            
-            $documentoId = $input['documento_id'];
-            $tipoAssinatura = $input['tipo_assinatura'];
-            $observacoes = $input['observacoes'] ?? '';
             
             // Buscar o documento
             $document = $this->document->findById($documentoId);
@@ -976,7 +1026,7 @@ class DocumentController {
             }
             
             // Verificar se o usuário está na lista de assinantes solicitados
-            $assinanteSolicitado = $this->documentAssinanteSolicitado->findByDocumentAndUser($documentoId, $user['id']);
+            $assinanteSolicitado = $this->documentAssinanteSolicitado->findByDocumentAndUser($documentoId, $user['user_id']);
             if (!$assinanteSolicitado) {
                 Response::forbidden('Você não está autorizado a assinar este documento');
                 return;
@@ -994,16 +1044,29 @@ class DocumentController {
                 return;
             }
             
-            // Processar certificado digital se fornecido
-            $certificadoPath = null;
-            if ($tipoAssinatura === 'digital' && isset($_FILES['certificado'])) {
-                $uploadResult = $this->handleCertificateUpload($_FILES['certificado']);
-                if ($uploadResult['success']) {
-                    $certificadoPath = $uploadResult['path'];
-                } else {
-                    Response::validation(['certificado' => [$uploadResult['error']]]);
-                    return;
+            // Processar assinatura baseada no tipo
+            $signatureResult = null;
+            $positionData = [
+                'x' => (float)$posicaoX,
+                'y' => (float)$posicaoY,
+                'page' => (int)$pagina
+            ];
+            
+            if ($tipoAssinatura === 'digital') {
+                $tipoCertificado = $_POST['tipo_certificado'] ?? 'arquivo';
+                if ($tipoCertificado === 'arquivo') {
+                    $signatureResult = $this->processDigitalSignature($document, $_FILES['certificado'], $_POST['senha_certificado'], $user, $positionData);
+                } elseif ($tipoCertificado === 'instalado') {
+                    $certificadoInstalado = json_decode($_POST['certificado_instalado'], true);
+                    $signatureResult = $this->processInstalledCertificateSignature($document, $certificadoInstalado, $_POST['senha_certificado'], $user, $positionData);
                 }
+            } elseif ($tipoAssinatura === 'eletronica') {
+                $signatureResult = $this->processElectronicSignature($document, $_POST['assinatura_data'], $user, $positionData);
+            }
+            
+            if (!$signatureResult['success']) {
+                Response::validation(['assinatura' => [$signatureResult['error']]]);
+                return;
             }
             
             // Atualizar status do assinante solicitado
@@ -1014,8 +1077,12 @@ class DocumentController {
                 'observacoes' => $observacoes
             ];
             
-            if ($certificadoPath) {
-                $updateData['certificado_path'] = $certificadoPath;
+            // Adicionar dados específicos da assinatura
+            if (isset($signatureResult['signature_path'])) {
+                $updateData['assinatura_path'] = $signatureResult['signature_path'];
+            }
+            if (isset($signatureResult['certificate_info'])) {
+                $updateData['certificado_info'] = json_encode($signatureResult['certificate_info']);
             }
             
             if ($this->documentAssinanteSolicitado->updateStatus($assinanteSolicitado['id'], $updateData)) {
@@ -1046,49 +1113,554 @@ class DocumentController {
     }
     
     /**
-     * Processa upload de certificado digital
+     * Processa assinatura digital usando certificado
      */
-    private function handleCertificateUpload($file) {
-        // Verificar se houve erro no upload
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            return ['success' => false, 'error' => 'Erro no upload do certificado'];
+    private function processDigitalSignature($document, $certificateFile, $password, $user, $positionData = null) {
+        try {
+            // Validar certificado sem armazená-lo
+            $certificateInfo = $this->validateCertificate($certificateFile, $password);
+            if (!$certificateInfo['valid']) {
+                return ['success' => false, 'error' => $certificateInfo['error']];
+            }
+            
+            // Aplicar assinatura digital ao documento (alterar propriedades)
+            $signResult = $this->applyDigitalSignatureToDocument($document, $certificateInfo, $user, $positionData);
+            if (!$signResult['success']) {
+                return ['success' => false, 'error' => $signResult['error']];
+            }
+            
+            return [
+                'success' => true,
+                'certificate_info' => [
+                    'subject' => $certificateInfo['subject'],
+                    'issuer' => $certificateInfo['issuer'],
+                    'valid_from' => $certificateInfo['valid_from'],
+                    'valid_to' => $certificateInfo['valid_to'],
+                    'serial_number' => $certificateInfo['serial_number']
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => 'Erro ao processar assinatura digital: ' . $e->getMessage()];
         }
-        
-        // Verificar tamanho do arquivo (máximo 5MB)
-        if ($file['size'] > 5 * 1024 * 1024) {
-            return ['success' => false, 'error' => 'Certificado muito grande. Máximo 5MB'];
+    }
+    
+    /**
+     * Processa assinatura eletrônica (lousa digital)
+     */
+    private function processElectronicSignature($document, $signatureData, $user, $positionData = null) {
+        try {
+            // Decodificar dados da assinatura (base64)
+            $signatureInfo = json_decode($signatureData, true);
+            if (!$signatureInfo) {
+                return ['success' => false, 'error' => 'Dados de assinatura inválidos'];
+            }
+            
+            // Salvar assinatura eletrônica
+            $saveResult = $this->saveElectronicSignature($signatureInfo, $document['id'], $user['user_id'], $positionData);
+            if (!$saveResult['success']) {
+                return ['success' => false, 'error' => $saveResult['error']];
+            }
+            
+            return [
+                'success' => true,
+                'signature_path' => $saveResult['path']
+            ];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => 'Erro ao processar assinatura eletrônica: ' . $e->getMessage()];
         }
-        
-        // Verificar extensão do arquivo
-        $allowedExtensions = ['p12', 'pfx', 'pem', 'crt', 'cer'];
-        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        
-        if (!in_array($fileExtension, $allowedExtensions)) {
-            return ['success' => false, 'error' => 'Formato de certificado inválido'];
-        }
-        
-        // Criar diretório de certificados se não existir
-        $uploadDir = __DIR__ . '/../uploads/certificates/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        
-        // Gerar nome único para o arquivo
-        $fileName = uniqid() . '_' . time() . '.' . $fileExtension;
-        $filePath = $uploadDir . $fileName;
-        
-        // Mover arquivo para o diretório de destino
-        if (move_uploaded_file($file['tmp_name'], $filePath)) {
-            return ['success' => true, 'path' => 'uploads/certificates/' . $fileName];
-        } else {
-            return ['success' => false, 'error' => 'Erro ao salvar certificado'];
+    }
+    
+    /**
+     * Valida certificado digital sem armazená-lo
+     */
+    private function validateCertificate($certificateFile, $password) {
+        try {
+            // Verificar se houve erro no upload
+            if ($certificateFile['error'] !== UPLOAD_ERR_OK) {
+                return ['valid' => false, 'error' => 'Erro no upload do certificado'];
+            }
+            
+            // Verificar tamanho do arquivo (máximo 5MB)
+            if ($certificateFile['size'] > 5 * 1024 * 1024) {
+                return ['valid' => false, 'error' => 'Certificado muito grande. Máximo 5MB'];
+            }
+            
+            // Verificar extensão do arquivo
+            $allowedExtensions = ['p12', 'pfx', 'pem', 'crt', 'cer'];
+            $fileExtension = strtolower(pathinfo($certificateFile['name'], PATHINFO_EXTENSION));
+            
+            if (!in_array($fileExtension, $allowedExtensions)) {
+                return ['valid' => false, 'error' => 'Formato de certificado inválido'];
+            }
+            
+            // Ler conteúdo do certificado temporariamente
+            $certificateContent = file_get_contents($certificateFile['tmp_name']);
+            
+            // Validar certificado baseado na extensão
+            if (in_array($fileExtension, ['p12', 'pfx'])) {
+                // Certificado PKCS#12
+                $certs = [];
+                if (!openssl_pkcs12_read($certificateContent, $certs, $password)) {
+                    return ['valid' => false, 'error' => 'Senha do certificado inválida ou certificado corrompido'];
+                }
+                
+                $certInfo = openssl_x509_parse($certs['cert']);
+            } else {
+                // Certificado PEM/CRT/CER
+                $certInfo = openssl_x509_parse($certificateContent);
+                if (!$certInfo) {
+                    return ['valid' => false, 'error' => 'Certificado inválido ou corrompido'];
+                }
+            }
+            
+            // Verificar se o certificado ainda é válido
+            $now = time();
+            if ($certInfo['validFrom_time_t'] > $now) {
+                return ['valid' => false, 'error' => 'Certificado ainda não é válido'];
+            }
+            if ($certInfo['validTo_time_t'] < $now) {
+                return ['valid' => false, 'error' => 'Certificado expirado'];
+            }
+            
+            return [
+                'valid' => true,
+                'subject' => $certInfo['subject']['CN'] ?? 'N/A',
+                'issuer' => $certInfo['issuer']['CN'] ?? 'N/A',
+                'valid_from' => date('Y-m-d H:i:s', $certInfo['validFrom_time_t']),
+                'valid_to' => date('Y-m-d H:i:s', $certInfo['validTo_time_t']),
+                'serial_number' => $certInfo['serialNumber'] ?? 'N/A',
+                'certificate_data' => $certificateContent
+            ];
+            
+        } catch (Exception $e) {
+            return ['valid' => false, 'error' => 'Erro ao validar certificado: ' . $e->getMessage()];
         }
     }
 
     /**
+     * Aplica assinatura digital ao documento (altera propriedades do arquivo)
+     */
+    private function applyDigitalSignatureToDocument($document, $certificateInfo, $user, $positionData = null) {
+        try {
+            error_log('DEBUG: Iniciando applyDigitalSignatureToDocument');
+            $documentPath = __DIR__ . '/../' . $document['caminho_arquivo'];
+            error_log('DEBUG: Caminho do documento: ' . $documentPath);
+            
+            if (!file_exists($documentPath)) {
+                error_log('DEBUG: Arquivo não encontrado: ' . $documentPath);
+                return ['success' => false, 'error' => 'Arquivo do documento não encontrado'];
+            }
+            
+            // Buscar dados completos do usuário (necessário para ambos os tipos de arquivo)
+            error_log('DEBUG: Buscando dados do usuário ID: ' . $user['user_id']);
+            $userModel = new User();
+            $fullUser = $userModel->findById($user['user_id']);
+            error_log('DEBUG: Dados do usuário encontrados: ' . ($fullUser ? 'sim' : 'não'));
+            
+            // Verificar se é um PDF (mais comum para assinatura digital)
+            $fileExtension = strtolower(pathinfo($document['nome_arquivo'], PATHINFO_EXTENSION));
+            
+            if ($fileExtension === 'pdf') {
+                // Para PDFs, tentar adicionar assinatura visual, mas se falhar, criar apenas metadados
+                
+                $signatureMetadata = [
+                    'signer_name' => $certificateInfo['subject'],
+                    'signer_certificate_issuer' => $certificateInfo['issuer'],
+                    'signature_date' => date('Y-m-d H:i:s'),
+                    'certificate_serial' => $certificateInfo['serial_number'],
+                    'user_id' => $user['user_id'],
+                    'user_name' => $fullUser['nome'] ?? 'Usuário não encontrado'
+                ];
+                
+                // Tentar criar uma versão assinada do documento
+                error_log('DEBUG: Tentando criar PDF assinado');
+                $signedDocumentPath = $this->createSignedPDF($documentPath, $signatureMetadata, $certificateInfo);
+                error_log('DEBUG: PDF assinado criado: ' . ($signedDocumentPath ? $signedDocumentPath : 'falhou'));
+                
+                if ($signedDocumentPath) {
+                    // Substituir o documento original pelo assinado
+                    error_log('DEBUG: Tentando substituir arquivo original');
+                    if (rename($signedDocumentPath, $documentPath)) {
+                        error_log('DEBUG: Arquivo substituído com sucesso');
+                        return ['success' => true, 'signed_document_path' => $document['nome_arquivo']];
+                    } else {
+                        error_log('DEBUG: Falha ao substituir arquivo original');
+                    }
+                } else {
+                    // Se falhar na criação do PDF assinado, criar arquivo de metadados como fallback
+                    error_log('DEBUG: Fallback - criando arquivo de metadados para PDF');
+                    $metadataPath = $documentPath . '.signature_metadata.json';
+                    $signatureMetadata['document_hash'] = hash_file('sha256', $documentPath);
+                    $signatureMetadata['signature_method'] = 'metadata_only';
+                    $signatureMetadata['reason'] = 'PDF compression not supported by free FPDI parser';
+                    
+                    if (file_put_contents($metadataPath, json_encode($signatureMetadata, JSON_PRETTY_PRINT))) {
+                        return ['success' => true, 'metadata_path' => $metadataPath];
+                    }
+                }
+            } else {
+                // Para outros tipos de arquivo, criar um arquivo de metadados de assinatura
+                $metadataPath = $documentPath . '.signature_metadata.json';
+                $signatureMetadata = [
+                    'document_file' => $document['nome_arquivo'],
+                    'signer_name' => $certificateInfo['subject'],
+                    'signer_certificate_issuer' => $certificateInfo['issuer'],
+                    'signature_date' => date('Y-m-d H:i:s'),
+                    'certificate_serial' => $certificateInfo['serial_number'],
+                    'user_id' => $user['user_id'],
+                    'user_name' => $fullUser['nome'] ?? 'Usuário não encontrado',
+                    'document_hash' => hash_file('sha256', $documentPath)
+                ];
+                
+                if (file_put_contents($metadataPath, json_encode($signatureMetadata, JSON_PRETTY_PRINT))) {
+                    return ['success' => true, 'metadata_path' => $metadataPath];
+                }
+            }
+            
+            return ['success' => false, 'error' => 'Erro ao aplicar assinatura digital ao documento'];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => 'Erro ao processar assinatura digital: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Cria uma versão assinada do PDF com assinatura visual e metadados
+     */
+    protected function createSignedPDF($originalPath, $metadata, $certificateInfo) {
+        try {
+            error_log('DEBUG: createSignedPDF - Iniciando');
+            error_log('DEBUG: createSignedPDF - Arquivo original: ' . $originalPath);
+            error_log('DEBUG: createSignedPDF - Arquivo existe: ' . (file_exists($originalPath) ? 'sim' : 'não'));
+            
+            require_once __DIR__ . '/../vendor/autoload.php';
+            error_log('DEBUG: createSignedPDF - Autoload carregado');
+            
+            $signedPath = str_replace('.pdf', '_signed_' . time() . '.pdf', $originalPath);
+            error_log('DEBUG: createSignedPDF - Caminho do arquivo assinado: ' . $signedPath);
+            
+            // Criar nova instância do FPDI (que estende TCPDF)
+            error_log('DEBUG: createSignedPDF - Criando instância FPDI');
+            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
+            error_log('DEBUG: createSignedPDF - FPDI criado com sucesso');
+            
+            // Configurar propriedades do documento
+            $pdf->SetCreator('DocGest - Sistema de Gestão de Documentos');
+            $pdf->SetAuthor($metadata['signer_name']);
+            $pdf->SetTitle('Documento Assinado Digitalmente');
+            $pdf->SetSubject('Assinatura Digital');
+            error_log('DEBUG: createSignedPDF - Propriedades configuradas');
+            
+            // Importar páginas do PDF original
+            error_log('DEBUG: createSignedPDF - Tentando importar páginas do PDF');
+            $pageCount = $pdf->setSourceFile($originalPath);
+            error_log('DEBUG: createSignedPDF - Número de páginas: ' . $pageCount);
+            
+            for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                error_log('DEBUG: createSignedPDF - Processando página: ' . $pageNo);
+                // Importar página
+                $templateId = $pdf->importPage($pageNo);
+                $size = $pdf->getTemplateSize($templateId);
+                $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $pdf->useTemplate($templateId);
+                
+                // Adicionar assinatura visual apenas na última página
+                if ($pageNo == $pageCount) {
+                    error_log('DEBUG: createSignedPDF - Adicionando assinatura visual na última página');
+                    $this->addVisualSignature($pdf, $metadata, $certificateInfo);
+                }
+            }
+            
+            // Salvar PDF assinado
+            error_log('DEBUG: createSignedPDF - Salvando PDF assinado');
+            $pdf->Output($signedPath, 'F');
+            error_log('DEBUG: createSignedPDF - PDF salvo com sucesso');
+            
+            return $signedPath;
+            
+        } catch (Exception $e) {
+            error_log('ERRO createSignedPDF: ' . $e->getMessage());
+            error_log('ERRO createSignedPDF Stack Trace: ' . $e->getTraceAsString());
+            return false;
+        }
+    }
+    
+    /**
+     * Adiciona assinatura visual ao PDF (versão compacta e discreta)
+     */
+    protected function addVisualSignature($pdf, $metadata, $certificateInfo) {
+        try {
+            // Posição da assinatura (canto inferior direito, mais compacta)
+            $x = $pdf->getPageWidth() - 55;
+            $y = $pdf->getPageHeight() - 25;
+            
+            // Configurar fonte menor e mais discreta
+            $pdf->SetFont('helvetica', '', 6);
+            $pdf->SetTextColor(100, 100, 100); // Cor cinza mais discreta
+            
+            // Desenhar caixa da assinatura mais fina
+            $pdf->SetDrawColor(150, 150, 150);
+            $pdf->SetLineWidth(0.2);
+            $pdf->Rect($x, $y, 50, 20);
+            
+            // Título da assinatura mais compacto
+            $pdf->SetFont('helvetica', 'B', 6);
+            $pdf->SetXY($x + 1, $y + 1);
+            $pdf->Cell(48, 3, 'ASSINADO DIGITALMENTE', 0, 1, 'C');
+            
+            // Linha separadora mais fina
+            $pdf->Line($x + 1, $y + 4, $x + 49, $y + 4);
+            
+            // Informações essenciais da assinatura (mais compactas)
+            $pdf->SetFont('helvetica', '', 5);
+            
+            // Nome do signatário (uma linha só)
+            $pdf->SetXY($x + 1, $y + 5);
+            $signerName = $this->truncateText($metadata['signer_name'], 20);
+            $pdf->Cell(48, 2, 'Por: ' . $signerName, 0, 1, 'L');
+            
+            // Data (uma linha só)
+            $pdf->SetXY($x + 1, $y + 8);
+            $signatureDate = date('d/m/Y H:i', strtotime($metadata['signature_date']));
+            $pdf->Cell(48, 2, 'Em: ' . $signatureDate, 0, 1, 'L');
+            
+            // Hash de validação compacto
+            $pdf->SetXY($x + 1, $y + 11);
+            $validationHash = substr(hash('sha256', json_encode($metadata)), 0, 12);
+            $pdf->Cell(48, 2, 'ID: ' . strtoupper($validationHash), 0, 1, 'L');
+            
+            // Ícone de certificado digital menor
+            $pdf->SetFont('helvetica', 'B', 8);
+            $pdf->SetTextColor(0, 100, 0);
+            $pdf->SetXY($x + 42, $y + 15);
+            $pdf->Cell(6, 3, '🔒', 0, 1, 'C');
+            
+        } catch (Exception $e) {
+            error_log('Erro ao adicionar assinatura visual: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Trunca texto para caber na assinatura visual
+     */
+    protected function truncateText($text, $maxLength) {
+        if (strlen($text) <= $maxLength) {
+            return $text;
+        }
+        return substr($text, 0, $maxLength - 3) . '...';
+    }
+    
+    /**
+     * Salva assinatura eletrônica na base de dados e arquivo no servidor
+     */
+    private function saveElectronicSignature($signatureInfo, $documentId, $userId, $positionData = null) {
+        try {
+            // Criar diretório de assinaturas se não existir
+            $signaturesDir = __DIR__ . '/../uploads/signatures/';
+            if (!is_dir($signaturesDir)) {
+                mkdir($signaturesDir, 0755, true);
+            }
+            
+            // Gerar nome único para o arquivo de assinatura
+            $signatureFileName = 'signature_' . $documentId . '_' . $userId . '_' . time() . '.png';
+            $signatureFilePath = $signaturesDir . $signatureFileName;
+            
+            // Processar dados da assinatura baseado no tipo
+            if (isset($signatureInfo['type']) && $signatureInfo['type'] === 'drawn') {
+                // Assinatura desenhada (canvas)
+                $imageData = $signatureInfo['data'];
+                
+                // Remover prefixo data:image/png;base64, se presente
+                if (strpos($imageData, 'data:image/png;base64,') === 0) {
+                    $imageData = substr($imageData, strlen('data:image/png;base64,'));
+                }
+                
+                // Decodificar e salvar imagem
+                $decodedImage = base64_decode($imageData);
+                if ($decodedImage && file_put_contents($signatureFilePath, $decodedImage)) {
+                    return [
+                        'success' => true,
+                        'path' => 'uploads/signatures/' . $signatureFileName,
+                        'type' => 'drawn'
+                    ];
+                }
+            } elseif (isset($signatureInfo['type']) && $signatureInfo['type'] === 'typed') {
+                // Assinatura digitada (texto com fonte)
+                $text = $signatureInfo['text'] ?? '';
+                $font = $signatureInfo['font'] ?? 'Arial';
+                $fontSize = $signatureInfo['fontSize'] ?? 24;
+                
+                // Criar imagem da assinatura digitada
+                $imageCreated = $this->createTypedSignatureImage($text, $font, $fontSize, $signatureFilePath);
+                
+                if ($imageCreated) {
+                    return [
+                        'success' => true,
+                        'path' => 'uploads/signatures/' . $signatureFileName,
+                        'type' => 'typed',
+                        'text' => $text,
+                        'font' => $font
+                    ];
+                }
+            }
+            
+            return ['success' => false, 'error' => 'Erro ao salvar assinatura eletrônica'];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => 'Erro ao processar assinatura eletrônica: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Cria imagem de assinatura digitada
+     */
+    private function createTypedSignatureImage($text, $font, $fontSize, $outputPath) {
+        try {
+            // Dimensões da imagem
+            $width = 400;
+            $height = 100;
+            
+            // Criar imagem
+            $image = imagecreate($width, $height);
+            
+            // Definir cores
+            $backgroundColor = imagecolorallocate($image, 255, 255, 255); // Branco
+            $textColor = imagecolorallocate($image, 0, 0, 0); // Preto
+            
+            // Adicionar texto
+            $fontPath = $this->getFontPath($font);
+            if ($fontPath && function_exists('imagettftext')) {
+                // Usar fonte TTF se disponível
+                imagettftext($image, $fontSize, 0, 20, 60, $textColor, $fontPath, $text);
+            } else {
+                // Usar fonte padrão
+                imagestring($image, 5, 20, 30, $text, $textColor);
+            }
+            
+            // Salvar imagem
+            $result = imagepng($image, $outputPath);
+            imagedestroy($image);
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Obtém caminho da fonte baseado no nome
+     */
+    private function getFontPath($fontName) {
+        $fontsDir = __DIR__ . '/../assets/fonts/';
+        $fontFiles = [
+            'Arial' => 'arial.ttf',
+            'Times' => 'times.ttf',
+            'Courier' => 'courier.ttf',
+            'Helvetica' => 'helvetica.ttf'
+        ];
+        
+        if (isset($fontFiles[$fontName])) {
+            $fontPath = $fontsDir . $fontFiles[$fontName];
+            if (file_exists($fontPath)) {
+                return $fontPath;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
      * Gera um hash único para acesso ao documento
      */
+    /**
+     * Processa assinatura com certificado instalado no Windows Certificate Store
+     */
+    private function processInstalledCertificateSignature($document, $certificateData, $password, $user, $positionData = null) {
+        try {
+            // Validar dados do certificado
+            if (!isset($certificateData['thumbprint']) || !isset($certificateData['subject'])) {
+                return ['success' => false, 'error' => 'Dados do certificado instalado inválidos'];
+            }
+            
+            // Simular validação do certificado instalado
+            // Em um ambiente real, seria necessário usar uma biblioteca específica
+            // para acessar o Windows Certificate Store
+            $certificateInfo = [
+                'subject' => $certificateData['subject'] ?? 'N/A',
+                'issuer' => $certificateData['issuer'] ?? 'N/A',
+                'thumbprint' => $certificateData['thumbprint'] ?? 'N/A',
+                'valid_from' => $certificateData['validFrom'] ?? null,
+                'valid_to' => $certificateData['validTo'] ?? null,
+                'serial_number' => $certificateData['serialNumber'] ?? 'N/A',
+                'tipo_certificado' => 'instalado'
+            ];
+            
+            // Verificar se o certificado está válido
+            if (isset($certificateData['validTo'])) {
+                $validTo = strtotime($certificateData['validTo']);
+                if ($validTo && $validTo < time()) {
+                    return ['success' => false, 'error' => 'Certificado expirado'];
+                }
+            }
+            
+            // Aplicar assinatura digital ao documento (alterar propriedades)
+            $signResult = $this->applyDigitalSignatureToDocument($document, $certificateInfo, $user);
+            if (!$signResult['success']) {
+                return ['success' => false, 'error' => $signResult['error']];
+            }
+            
+            // Gerar hash da assinatura (simulado)
+            $signatureHash = hash('sha256', $document['id'] . $user['user_id'] . time() . $certificateData['thumbprint']);
+            
+            // Criar metadados da assinatura
+            $signatureMetadata = [
+                'timestamp' => date('Y-m-d H:i:s'),
+                'user_id' => $user['user_id'],
+                'document_id' => $document['id'],
+                'certificate_thumbprint' => $certificateData['thumbprint'],
+                'signature_hash' => $signatureHash,
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+            ];
+            
+            return [
+                'success' => true,
+                'certificate_info' => $certificateInfo,
+                'signature_metadata' => $signatureMetadata
+            ];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao processar certificado instalado: ' . $e->getMessage());
+            return ['success' => false, 'error' => 'Erro interno ao processar certificado instalado'];
+        }
+    }
+    
     private function generateAccessHash() {
         return hash('sha256', uniqid() . microtime(true) . random_bytes(16));
+    }
+    
+    /**
+     * Formata a data de competência de YYYY-MM para YYYY-MM-01
+     */
+    private function formatCompetenciaDate($competencia) {
+        if (empty($competencia)) {
+            return null;
+        }
+        
+        // Se já está no formato completo (YYYY-MM-DD), retorna como está
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $competencia)) {
+            return $competencia;
+        }
+        
+        // Se está no formato YYYY-MM, adiciona -01
+        if (preg_match('/^\d{4}-\d{2}$/', $competencia)) {
+            return $competencia . '-01';
+        }
+        
+        // Se não está em nenhum formato esperado, retorna null
+        return null;
     }
 }

@@ -137,6 +137,7 @@ CREATE TABLE documentos (
     prazo_assinatura DATE COMMENT 'Data limite até quando o documento pode ser assinado',
     competencia DATE COMMENT 'Mês/ano de competência do documento (ex: folha de pagamento)',
     validade_legal DATE COMMENT 'Data de validade legal do documento (se aplicável)',
+    vinculado_a INT COMMENT 'ID do usuário ao qual o documento está vinculado para controle e gestão',
     criado_por INT NOT NULL,
     empresa_id INT NOT NULL,
     filial_id INT,
@@ -146,7 +147,8 @@ CREATE TABLE documentos (
     FOREIGN KEY (criado_por) REFERENCES usuarios(id),
     FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
     FOREIGN KEY (filial_id) REFERENCES filiais(id) ON DELETE SET NULL,
-    FOREIGN KEY (tipo_documento_id) REFERENCES tipos_documentos(id) ON DELETE SET NULL
+    FOREIGN KEY (tipo_documento_id) REFERENCES tipos_documentos(id) ON DELETE SET NULL,
+    FOREIGN KEY (vinculado_a) REFERENCES usuarios(id) ON DELETE SET NULL
 );
 
 -- ================================================
@@ -222,6 +224,12 @@ CREATE TABLE documento_assinantes_solicitados (
     status ENUM('pendente','notificado','assinado','rejeitado','cancelado') DEFAULT 'pendente',
     data_solicitacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_notificacao DATETIME,
+    data_assinatura DATETIME COMMENT 'Data em que o documento foi assinado',
+    tipo_assinatura ENUM('eletronica','digital') COMMENT 'Tipo de assinatura escolhida pelo usuário',
+    certificado_path VARCHAR(500) COMMENT 'Caminho do certificado digital (se aplicável)',
+    assinatura_path VARCHAR(500) COMMENT 'Caminho da assinatura eletrônica (imagem)',
+    certificado_info TEXT COMMENT 'Informações do certificado digital em JSON',
+    assinatura_metadata TEXT COMMENT 'Metadados da assinatura eletrônica em JSON',
     observacoes TEXT,
     ativo BOOLEAN DEFAULT TRUE,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -312,6 +320,7 @@ CREATE INDEX idx_documentos_prazo_assinatura ON documentos(prazo_assinatura);
 CREATE INDEX idx_documentos_competencia ON documentos(competencia);
 CREATE INDEX idx_documentos_validade_legal ON documentos(validade_legal);
 CREATE INDEX idx_documentos_solicitar_assinatura ON documentos(solicitar_assinatura);
+CREATE INDEX idx_documentos_vinculado_a ON documentos(vinculado_a);
 CREATE INDEX idx_documento_assinantes_documento ON documento_assinantes(documento_id);
 CREATE INDEX idx_documento_assinantes_usuario ON documento_assinantes(usuario_id);
 CREATE INDEX idx_documento_assinantes_status ON documento_assinantes(status);
@@ -371,6 +380,8 @@ SELECT
     d.prazo_assinatura,
     d.competencia,
     d.validade_legal,
+    d.vinculado_a,
+    uv.nome as vinculado_a_nome,
     d.criado_por,
     u.nome as criado_por_nome,
     d.empresa_id,
@@ -381,6 +392,7 @@ SELECT
     d.data_atualizacao
 FROM documentos d
 LEFT JOIN usuarios u ON d.criado_por = u.id
+LEFT JOIN usuarios uv ON d.vinculado_a = uv.id
 LEFT JOIN empresas e ON d.empresa_id = e.id
 LEFT JOIN filiais f ON d.filial_id = f.id
 LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id

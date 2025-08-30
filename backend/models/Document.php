@@ -14,8 +14,8 @@ class Document {
         // Gerar hash único para o documento
         $hash_acesso = hash('sha256', uniqid() . microtime(true) . random_bytes(16));
         
-        $sql = "INSERT INTO {$this->table} (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, tipo_documento_id, prazo_assinatura, competencia, validade_legal, criado_por, empresa_id, filial_id, hash_acesso) 
-                VALUES (:titulo, :descricao, :nome_arquivo, :caminho_arquivo, :tamanho_arquivo, :tipo_arquivo, :status, :tipo_documento_id, :prazo_assinatura, :competencia, :validade_legal, :criado_por, :empresa_id, :filial_id, :hash_acesso)";
+        $sql = "INSERT INTO {$this->table} (titulo, descricao, nome_arquivo, caminho_arquivo, tamanho_arquivo, tipo_arquivo, status, solicitar_assinatura, tipo_documento_id, prazo_assinatura, competencia, validade_legal, vinculado_a, criado_por, empresa_id, filial_id, hash_acesso) 
+                VALUES (:titulo, :descricao, :nome_arquivo, :caminho_arquivo, :tamanho_arquivo, :tipo_arquivo, :status, :solicitar_assinatura, :tipo_documento_id, :prazo_assinatura, :competencia, :validade_legal, :vinculado_a, :criado_por, :empresa_id, :filial_id, :hash_acesso)";
         
         $stmt = $this->db->prepare($sql);
         
@@ -26,10 +26,12 @@ class Document {
         $stmt->bindParam(':tamanho_arquivo', $data['tamanho_arquivo']);
         $stmt->bindParam(':tipo_arquivo', $data['tipo_arquivo']);
         $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':solicitar_assinatura', $data['solicitar_assinatura'], PDO::PARAM_BOOL);
         $stmt->bindParam(':tipo_documento_id', $data['tipo_documento_id']);
         $stmt->bindParam(':prazo_assinatura', $data['prazo_assinatura']);
         $stmt->bindParam(':competencia', $data['competencia']);
         $stmt->bindParam(':validade_legal', $data['validade_legal']);
+        $stmt->bindParam(':vinculado_a', $data['vinculado_a']);
         $stmt->bindParam(':criado_por', $data['criado_por']);
         $stmt->bindParam(':empresa_id', $data['empresa_id']);
         $stmt->bindParam(':filial_id', $data['filial_id']);
@@ -43,9 +45,10 @@ class Document {
     }
     
     public function findByHash($hash) {
-        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome, td.nome as tipo_documento_nome 
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome, td.nome as tipo_documento_nome, uv.nome as vinculado_a_nome 
                 FROM {$this->table} d 
                 LEFT JOIN usuarios u ON d.criado_por = u.id 
+                LEFT JOIN usuarios uv ON d.vinculado_a = uv.id 
                 LEFT JOIN empresas e ON d.empresa_id = e.id 
                 LEFT JOIN filiais f ON d.filial_id = f.id 
                 LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id 
@@ -75,9 +78,10 @@ class Document {
     }
     
     public function findById($id) {
-        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome, td.nome as tipo_documento_nome 
+        $sql = "SELECT d.*, u.nome as criado_por_nome, e.nome as empresa_nome, f.nome as filial_nome, td.nome as tipo_documento_nome, uv.nome as vinculado_a_nome 
                 FROM {$this->table} d 
                 LEFT JOIN usuarios u ON d.criado_por = u.id 
+                LEFT JOIN usuarios uv ON d.vinculado_a = uv.id 
                 LEFT JOIN empresas e ON d.empresa_id = e.id 
                 LEFT JOIN filiais f ON d.filial_id = f.id 
                 LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id 
@@ -90,6 +94,21 @@ class Document {
         $document = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($document) {
+            // Converter solicitar_assinatura para boolean
+            $document['solicitar_assinatura'] = (bool)$document['solicitar_assinatura'];
+            
+            // Formatar datas para o formato correto do input date (YYYY-MM-DD)
+            if ($document['prazo_assinatura']) {
+                $document['prazo_assinatura'] = date('Y-m-d', strtotime($document['prazo_assinatura']));
+            }
+            if ($document['competencia']) {
+                // Para competência, retornar apenas YYYY-MM para o input month
+                $document['competencia'] = date('Y-m', strtotime($document['competencia']));
+            }
+            if ($document['validade_legal']) {
+                $document['validade_legal'] = date('Y-m-d', strtotime($document['validade_legal']));
+            }
+            
             // Buscar assinantes do documento
             $assinantesSql = "SELECT da.usuario_id, u.nome, u.email 
                              FROM documento_assinantes da 
@@ -101,6 +120,18 @@ class Document {
             $assinantesStmt->execute();
             
             $document['assinantes'] = $assinantesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Buscar assinantes solicitados do documento
+            $assinantesSolicitadosSql = "SELECT das.usuario_id, u.nome, u.email, das.status, das.data_solicitacao 
+                                        FROM documento_assinantes_solicitados das 
+                                        LEFT JOIN usuarios u ON das.usuario_id = u.id 
+                                        WHERE das.documento_id = :documento_id AND das.ativo = 1";
+            
+            $assinantesSolicitadosStmt = $this->db->prepare($assinantesSolicitadosSql);
+            $assinantesSolicitadosStmt->bindParam(':documento_id', $id);
+            $assinantesSolicitadosStmt->execute();
+            
+            $document['assinantes_solicitados'] = $assinantesSolicitadosStmt->fetchAll(PDO::FETCH_ASSOC);
         }
         
         return $document;
@@ -181,8 +212,27 @@ class Document {
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         
+        $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Converter solicitar_assinatura para boolean e buscar assinantes solicitados para todos os documentos
+        foreach ($documents as &$document) {
+            $document['solicitar_assinatura'] = (bool)$document['solicitar_assinatura'];
+            
+            // Buscar assinantes solicitados do documento
+            $assinantesSolicitadosSql = "SELECT das.usuario_id, u.nome, u.email, das.status, das.data_solicitacao 
+                                        FROM documento_assinantes_solicitados das 
+                                        LEFT JOIN usuarios u ON das.usuario_id = u.id 
+                                        WHERE das.documento_id = :documento_id AND das.ativo = 1";
+            
+            $assinantesSolicitadosStmt = $this->db->prepare($assinantesSolicitadosSql);
+            $assinantesSolicitadosStmt->bindParam(':documento_id', $document['id']);
+            $assinantesSolicitadosStmt->execute();
+            
+            $document['assinantes_solicitados'] = $assinantesSolicitadosStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
         return [
-            'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'data' => $documents,
             'total' => $total,
             'page' => $page,
             'pageSize' => $pageSize,
@@ -194,7 +244,7 @@ class Document {
         $fields = [];
         $params = [':id' => $id];
         
-        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'tipo_documento_id', 'prazo_assinatura', 'competencia', 'validade_legal', 'empresa_id', 'filial_id', 'hash_acesso'];
+        $allowedFields = ['titulo', 'descricao', 'nome_arquivo', 'caminho_arquivo', 'tamanho_arquivo', 'tipo_arquivo', 'status', 'tipo_documento_id', 'prazo_assinatura', 'competencia', 'validade_legal', 'vinculado_a', 'empresa_id', 'filial_id', 'hash_acesso', 'solicitar_assinatura'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
@@ -274,7 +324,26 @@ class Document {
         $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Converter solicitar_assinatura para boolean e buscar assinantes solicitados
+        foreach ($documents as &$document) {
+            $document['solicitar_assinatura'] = (bool)$document['solicitar_assinatura'];
+            
+            // Buscar assinantes solicitados do documento
+            $assinantesSolicitadosSql = "SELECT das.usuario_id, u.nome, u.email, das.status, das.data_solicitacao 
+                                        FROM documento_assinantes_solicitados das 
+                                        LEFT JOIN usuarios u ON das.usuario_id = u.id 
+                                        WHERE das.documento_id = :documento_id AND das.ativo = 1";
+            
+            $assinantesSolicitadosStmt = $this->db->prepare($assinantesSolicitadosSql);
+            $assinantesSolicitadosStmt->bindParam(':documento_id', $document['id']);
+            $assinantesSolicitadosStmt->execute();
+            
+            $document['assinantes_solicitados'] = $assinantesSolicitadosStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $documents;
     }
     
     /**
@@ -293,7 +362,26 @@ class Document {
         $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Converter solicitar_assinatura para boolean e buscar assinantes solicitados
+        foreach ($documents as &$document) {
+            $document['solicitar_assinatura'] = (bool)$document['solicitar_assinatura'];
+            
+            // Buscar assinantes solicitados do documento
+            $assinantesSolicitadosSql = "SELECT das.usuario_id, u.nome, u.email, das.status, das.data_solicitacao 
+                                        FROM documento_assinantes_solicitados das 
+                                        LEFT JOIN usuarios u ON das.usuario_id = u.id 
+                                        WHERE das.documento_id = :documento_id AND das.ativo = 1";
+            
+            $assinantesSolicitadosStmt = $this->db->prepare($assinantesSolicitadosSql);
+            $assinantesSolicitadosStmt->bindParam(':documento_id', $document['id']);
+            $assinantesSolicitadosStmt->execute();
+            
+            $document['assinantes_solicitados'] = $assinantesSolicitadosStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $documents;
     }
     
     /**
@@ -312,7 +400,26 @@ class Document {
         $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Converter solicitar_assinatura para boolean e buscar assinantes solicitados
+        foreach ($documents as &$document) {
+            $document['solicitar_assinatura'] = (bool)$document['solicitar_assinatura'];
+            
+            // Buscar assinantes solicitados do documento
+            $assinantesSolicitadosSql = "SELECT das.usuario_id, u.nome, u.email, das.status, das.data_solicitacao 
+                                        FROM documento_assinantes_solicitados das 
+                                        LEFT JOIN usuarios u ON das.usuario_id = u.id 
+                                        WHERE das.documento_id = :documento_id AND das.ativo = 1";
+            
+            $assinantesSolicitadosStmt = $this->db->prepare($assinantesSolicitadosSql);
+            $assinantesSolicitadosStmt->bindParam(':documento_id', $document['id']);
+            $assinantesSolicitadosStmt->execute();
+            
+            $document['assinantes_solicitados'] = $assinantesSolicitadosStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $documents;
      }
      
      public function getStats($filters = []) {
@@ -384,6 +491,23 @@ class Document {
         }
         $stmt->execute();
         $recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Converter solicitar_assinatura para boolean e buscar assinantes solicitados nos documentos recentes
+        foreach ($recentes as &$document) {
+            $document['solicitar_assinatura'] = (bool)$document['solicitar_assinatura'];
+            
+            // Buscar assinantes solicitados do documento
+            $assinantesSolicitadosSql = "SELECT das.usuario_id, u.nome, u.email, das.status, das.data_solicitacao 
+                                        FROM documento_assinantes_solicitados das 
+                                        LEFT JOIN usuarios u ON das.usuario_id = u.id 
+                                        WHERE das.documento_id = :documento_id AND das.ativo = 1";
+            
+            $assinantesSolicitadosStmt = $this->db->prepare($assinantesSolicitadosSql);
+            $assinantesSolicitadosStmt->bindParam(':documento_id', $document['id']);
+            $assinantesSolicitadosStmt->execute();
+            
+            $document['assinantes_solicitados'] = $assinantesSolicitadosStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
         
         return [
             'geral' => $geral,

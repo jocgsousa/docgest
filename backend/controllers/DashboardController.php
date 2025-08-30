@@ -4,6 +4,7 @@ require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../models/Company.php';
 require_once __DIR__ . '/../models/Document.php';
 require_once __DIR__ . '/../models/DocumentAssinante.php';
+require_once __DIR__ . '/../models/DocumentAssinanteSolicitado.php';
 require_once __DIR__ . '/../models/Signature.php';
 require_once __DIR__ . '/../models/Branch.php';
 require_once __DIR__ . '/../utils/JWT.php';
@@ -14,6 +15,7 @@ class DashboardController {
     private $companyModel;
     private $documentModel;
     private $documentAssinanteModel;
+    private $documentAssinanteSolicitadoModel;
     private $signatureModel;
     private $branchModel;
     
@@ -22,6 +24,7 @@ class DashboardController {
         $this->companyModel = new Company();
         $this->documentModel = new Document();
         $this->documentAssinanteModel = new DocumentAssinante();
+        $this->documentAssinanteSolicitadoModel = new DocumentAssinanteSolicitado();
         $this->signatureModel = new Signature();
         $this->branchModel = new Branch();
     }
@@ -75,18 +78,20 @@ class DashboardController {
                 ];
             } else {
                 // Assinante - estatísticas pessoais
-                // Contar documentos criados pelo usuário + documentos onde ele é assinante
+                // Contar documentos criados pelo usuário + documentos onde ele é assinante + documentos solicitados para assinatura
                 $documentosCriados = $this->documentModel->countByUser($currentUser['user_id']);
                 $documentosAssinante = $this->documentAssinanteModel->countByUser($currentUser['user_id']);
+                $documentosSolicitados = $this->documentAssinanteSolicitadoModel->countByUser($currentUser['user_id']);
                 
-                // Contar pendentes: assinaturas pendentes criadas pelo usuário + documentos pendentes onde ele é assinante
+                // Contar pendentes: assinaturas pendentes criadas pelo usuário + documentos pendentes onde ele é assinante + documentos pendentes solicitados
                 $assinaturasPendentes = $this->signatureModel->countPendingByUser($currentUser['user_id']);
                 $documentosPendentes = $this->documentAssinanteModel->countPendingByUser($currentUser['user_id']);
+                $documentosSolicitadosPendentes = $this->documentAssinanteSolicitadoModel->countPendingByUser($currentUser['user_id']);
                 
                 $stats = [
-                    'documentos' => $documentosCriados + $documentosAssinante,
+                    'documentos' => $documentosCriados + $documentosAssinante + $documentosSolicitados,
                     'assinaturas' => $this->signatureModel->countByUser($currentUser['user_id']),
-                    'pendentes' => $assinaturasPendentes + $documentosPendentes
+                    'pendentes' => $assinaturasPendentes + $documentosPendentes + $documentosSolicitadosPendentes
                 ];
             }
             

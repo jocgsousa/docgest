@@ -9,6 +9,9 @@ import Card from '../components/Card';
 import Table from '../components/Table';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import SignaturePad from '../components/SignaturePad';
+import CertificateSelector from '../components/CertificateSelector';
+import PDFViewer from '../components/PDFViewer';
 import { formatErrors } from '../utils/fieldLabels';
 import { toast } from 'react-toastify';
 import { FaPlus, FaEdit, FaTrash, FaEye, FaUpload, FaFilePdf, FaFileWord, FaFileExcel, FaFileImage, FaFile, FaTimes, FaDownload } from 'react-icons/fa';
@@ -213,6 +216,7 @@ const Documents = ({ openCreateModal = false }) => {
     arquivo: null, 
     empresa_id: '', 
     filial_id: '', 
+    vinculado_a: '',
     assinantes: [],
     solicitar_assinatura: false,
     assinantes_solicitados: [],
@@ -254,9 +258,19 @@ const Documents = ({ openCreateModal = false }) => {
   const [signatureType, setSignatureType] = useState('eletronica');
   const [signatureData, setSignatureData] = useState({
     observacoes: '',
-    certificado: null
+    certificado: null,
+    assinatura_data: null,
+    senha_certificado: '',
+    certificado_instalado: null
   });
+  const [certificateType, setCertificateType] = useState('arquivo'); // 'arquivo' ou 'instalado'
   const [signingInProgress, setSigningInProgress] = useState(false);
+  
+  // Estados para posicionamento da assinatura
+  const [showPositionSelector, setShowPositionSelector] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState(null);
+  const [documentUrl, setDocumentUrl] = useState(null);
+  const [signatureStep, setSignatureStep] = useState('form'); // 'form' ou 'position'
 
   const statusOptions = [
     { value: '', label: 'Todos os status' },
@@ -337,7 +351,7 @@ const Documents = ({ openCreateModal = false }) => {
               </Button>
             </>
           )}
-          {user?.tipo_usuario === 3 && row.solicitar_assinatura && row.assinantes_solicitados && 
+          {user?.tipo_usuario === 3 && row.solicitar_assinatura === true && row.assinantes_solicitados && 
            row.assinantes_solicitados.some(assinante => assinante.usuario_id === user?.id && assinante.status === 'pendente') && (
             <Button
               size="sm"
@@ -386,7 +400,7 @@ const Documents = ({ openCreateModal = false }) => {
   useEffect(() => {
     if (formData.empresa_id) {
       loadBranches(formData.empresa_id);
-      loadUsers(formData.empresa_id, formData.filial_id);
+      loadUsersForBinding(formData.empresa_id, formData.filial_id);
     } else {
       setBranches([]);
       setAvailableUsers([]);
@@ -395,7 +409,7 @@ const Documents = ({ openCreateModal = false }) => {
 
   useEffect(() => {
     if (formData.empresa_id && formData.filial_id) {
-      loadUsers(formData.empresa_id, formData.filial_id);
+      loadUsersForBinding(formData.empresa_id, formData.filial_id);
     }
   }, [formData.filial_id]);
 
@@ -447,7 +461,7 @@ const Documents = ({ openCreateModal = false }) => {
     }
   };
 
-  // Carregar usuários por empresa e filial
+  // Carregar usuários por empresa e filial (apenas assinantes)
   const loadUsers = async (empresaId, filialId) => {
     if (!empresaId) return;
     
@@ -462,6 +476,27 @@ const Documents = ({ openCreateModal = false }) => {
       }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
+      setAvailableUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+  
+  // Carregar todos os usuários da empresa para vinculação de documentos
+  const loadUsersForBinding = async (empresaId, filialId) => {
+    if (!empresaId) return;
+    
+    try {
+      setLoadingUsers(true);
+      const params = { empresa_id: empresaId };
+      if (filialId) params.filial_id = filialId;
+      
+      const response = await api.get('/users/for-document-binding', { params });
+      if (response.data.success) {
+        setAvailableUsers(Array.isArray(response.data.data) ? response.data.data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar usuários para vinculação:', error);
       setAvailableUsers([]);
     } finally {
       setLoadingUsers(false);
@@ -521,6 +556,12 @@ const Documents = ({ openCreateModal = false }) => {
       if (formData.competencia) {
         submitData.append('competencia', formData.competencia);
       }
+      if (formData.validade_legal) {
+        submitData.append('validade_legal', formData.validade_legal);
+      }
+      if (formData.vinculado_a) {
+        submitData.append('vinculado_a', formData.vinculado_a);
+      }
 
       if (editingDocument) {
         await api.put(`/documents/${editingDocument.id}`, submitData, {
@@ -569,7 +610,7 @@ const Documents = ({ openCreateModal = false }) => {
       
       // Carregar usuários se há empresa selecionada
       if (fullDocument.empresa_id) {
-        await loadUsers(fullDocument.empresa_id, fullDocument.filial_id);
+        await loadUsersForBinding(fullDocument.empresa_id, fullDocument.filial_id);
       }
       
       // Extrair IDs dos assinantes
@@ -584,6 +625,7 @@ const Documents = ({ openCreateModal = false }) => {
         arquivo: null,
         empresa_id: fullDocument.empresa_id || '',
         filial_id: fullDocument.filial_id || '',
+        vinculado_a: fullDocument.vinculado_a || '',
         assinantes: assinantesIds,
         solicitar_assinatura: fullDocument.solicitar_assinatura || false,
         assinantes_solicitados: assinantesSolicitadosIds,
@@ -779,14 +821,34 @@ const Documents = ({ openCreateModal = false }) => {
     }
   };
 
-  const handleSign = (document) => {
+  const handleSign = async (document) => {
     setSigningDocument(document);
     setShowSignModal(true);
     setSignatureType('eletronica');
     setSignatureData({
       observacoes: '',
-      certificado: null
+      certificado: null,
+      assinatura_data: null,
+      senha_certificado: '',
+      certificado_instalado: null
     });
+    setCertificateType('arquivo');
+    setSignatureStep('form');
+    setSelectedPosition(null);
+    
+    // Preparar URL do documento para visualização
+    if (document.caminho_arquivo) {
+      try {
+        const response = await api.get(`/documents/${document.id}/view`, {
+          responseType: 'blob'
+        });
+        const url = URL.createObjectURL(response.data);
+        setDocumentUrl(url);
+      } catch (error) {
+        console.error('Erro ao carregar documento para assinatura:', error);
+        toast.error('Erro ao carregar documento');
+      }
+    }
   };
 
   const handleCloseSignModal = () => {
@@ -795,14 +857,56 @@ const Documents = ({ openCreateModal = false }) => {
     setSignatureType('eletronica');
     setSignatureData({
       observacoes: '',
-      certificado: null
+      certificado: null,
+      assinatura_data: null,
+      senha_certificado: '',
+      certificado_instalado: null
     });
+    setCertificateType('arquivo');
+    setSignatureStep('form');
+    setSelectedPosition(null);
+    
+    // Limpar URL do documento
+    if (documentUrl) {
+      URL.revokeObjectURL(documentUrl);
+      setDocumentUrl(null);
+    }
+  };
+
+  const handleNextToPosition = () => {
+    // Validar dados do formulário antes de prosseguir
+    const isValid = signatureType === 'eletronica' 
+      ? signatureData.assinatura_data
+      : signatureData.senha_certificado && 
+        ((certificateType === 'arquivo' && signatureData.certificado) ||
+         (certificateType === 'instalado' && signatureData.certificado_instalado));
+    
+    if (!isValid) {
+      toast.error('Preencha todos os campos obrigatórios antes de continuar');
+      return;
+    }
+    
+    setSignatureStep('position');
+  };
+
+  const handleBackToForm = () => {
+    setSignatureStep('form');
+    setSelectedPosition(null);
+  };
+
+  const handlePositionSelect = (position) => {
+    setSelectedPosition(position);
   };
 
   const handleSubmitSignature = async (e) => {
     e.preventDefault();
     
     if (!signingDocument) return;
+    
+    if (!selectedPosition) {
+      toast.error('Selecione a posição da assinatura no documento');
+      return;
+    }
     
     try {
       setSigningInProgress(true);
@@ -811,8 +915,24 @@ const Documents = ({ openCreateModal = false }) => {
       formData.append('tipo_assinatura', signatureType);
       formData.append('observacoes', signatureData.observacoes);
       
-      if (signatureType === 'digital' && signatureData.certificado) {
-        formData.append('certificado', signatureData.certificado);
+      // Adicionar coordenadas da posição da assinatura
+      formData.append('posicao_x', selectedPosition.x);
+      formData.append('posicao_y', selectedPosition.y);
+      formData.append('pagina', selectedPosition.page);
+      
+      if (signatureType === 'digital') {
+        formData.append('tipo_certificado', certificateType);
+        formData.append('senha_certificado', signatureData.senha_certificado);
+        
+        if (certificateType === 'arquivo' && signatureData.certificado) {
+          formData.append('certificado', signatureData.certificado);
+        } else if (certificateType === 'instalado' && signatureData.certificado_instalado) {
+          formData.append('certificado_instalado', JSON.stringify(signatureData.certificado_instalado));
+        }
+      }
+      
+      if (signatureType === 'eletronica' && signatureData.assinatura_data) {
+        formData.append('assinatura_data', JSON.stringify(signatureData.assinatura_data));
       }
       
       await api.post(`/documents/${signingDocument.id}/sign`, formData, {
@@ -840,6 +960,7 @@ const Documents = ({ openCreateModal = false }) => {
       arquivo: null, 
       empresa_id: '', 
       filial_id: '', 
+      vinculado_a: '',
       assinantes: [],
       solicitar_assinatura: false,
       assinantes_solicitados: [],
@@ -1135,6 +1256,36 @@ const Documents = ({ openCreateModal = false }) => {
           </FormGrid>
 
           <FormGrid>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Usuário Vinculado
+              </label>
+              <select
+                value={formData.vinculado_a}
+                onChange={(e) => setFormData(prev => ({ ...prev, vinculado_a: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                disabled={!formData.empresa_id || availableUsers.length === 0}
+              >
+                <option value="">Nenhum usuário vinculado</option>
+                {Array.isArray(availableUsers) && availableUsers.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.nome} ({user.email})
+                  </option>
+                ))}
+              </select>
+              {errors.vinculado_a && (
+                <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                  {errors.vinculado_a[0]}
+                </span>
+              )}
+            </div>
+
             <div>
               <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
                 Classificação
@@ -1588,9 +1739,14 @@ const Documents = ({ openCreateModal = false }) => {
       <Modal
         isOpen={showSignModal}
         onClose={handleCloseSignModal}
-        title={`Assinar Documento: ${signingDocument?.titulo || ''}`}
+        title={signatureStep === 'form' 
+          ? `Assinar Documento: ${signingDocument?.titulo || ''}` 
+          : 'Posicionar Assinatura no Documento'
+        }
+        size={signatureStep === 'position' ? 'large' : 'medium'}
       >
-        <form onSubmit={handleSubmitSignature}>
+        {signatureStep === 'form' ? (
+          <form onSubmit={(e) => { e.preventDefault(); handleNextToPosition(); }}>
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
               Tipo de Assinatura
@@ -1619,15 +1775,106 @@ const Documents = ({ openCreateModal = false }) => {
             </div>
           </div>
 
+          {signatureType === 'eletronica' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                Assinatura Eletrônica *
+              </label>
+              {selectedPosition && (
+                <div style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#d4edda',
+                  border: '1px solid #c3e6cb',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  color: '#155724',
+                  marginBottom: '12px'
+                }}>
+                  ✅ Posição selecionada: Página {selectedPosition.page}, X: {Math.round(selectedPosition.x)}, Y: {Math.round(selectedPosition.y)}
+                </div>
+              )}
+              <SignaturePad
+                onSignatureChange={(signature) => setSignatureData(prev => ({ ...prev, assinatura_data: signature }))}
+                value={signatureData.assinatura_data}
+              />
+            </div>
+          )}
+
           {signatureType === 'digital' && (
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
-                Certificado Digital *
+                Tipo de Certificado *
+              </label>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="certificateType"
+                    value="arquivo"
+                    checked={certificateType === 'arquivo'}
+                    onChange={(e) => setCertificateType(e.target.value)}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Arquivo (.p12/.pfx)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="certificateType"
+                    value="instalado"
+                    checked={certificateType === 'instalado'}
+                    onChange={(e) => setCertificateType(e.target.value)}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Certificado Instalado
+                </label>
+              </div>
+
+              {certificateType === 'arquivo' && (
+                <div>
+                  <input
+                    type="file"
+                    accept=".p12,.pfx"
+                    onChange={(e) => setSignatureData(prev => ({ ...prev, certificado: e.target.files[0] }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Selecione seu arquivo de certificado digital (.p12 ou .pfx)
+                  </p>
+                </div>
+              )}
+
+              {certificateType === 'instalado' && (
+                <div>
+                  <CertificateSelector
+                    onCertificateSelect={(cert) => setSignatureData(prev => ({ ...prev, certificado_instalado: cert }))}
+                    selectedCertificate={signatureData.certificado_instalado}
+                  />
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Selecione um certificado instalado no seu computador
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {signatureType === 'digital' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                Senha do Certificado *
               </label>
               <input
-                type="file"
-                accept=".p12,.pfx"
-                onChange={(e) => setSignatureData(prev => ({ ...prev, certificado: e.target.files[0] }))}
+                type="password"
+                placeholder="Digite a senha do certificado"
+                value={signatureData.senha_certificado || ''}
+                onChange={(e) => setSignatureData(prev => ({ ...prev, senha_certificado: e.target.value }))}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1637,9 +1884,6 @@ const Documents = ({ openCreateModal = false }) => {
                 }}
                 required
               />
-              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Selecione seu arquivo de certificado digital (.p12 ou .pfx)
-              </p>
             </div>
           )}
 
@@ -1664,24 +1908,76 @@ const Documents = ({ openCreateModal = false }) => {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <Button
-              type="button"
-              $variant="outline"
-              onClick={handleCloseSignModal}
-              disabled={signingInProgress}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              loading={signingInProgress}
-              disabled={signatureType === 'digital' && !signatureData.certificado}
-            >
-              Assinar Documento
-            </Button>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <Button
+                type="button"
+                $variant="outline"
+                onClick={handleCloseSignModal}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit"
+                disabled={
+                  (signatureType === 'digital' && (
+                    !signatureData.senha_certificado ||
+                    (certificateType === 'arquivo' && !signatureData.certificado) ||
+                    (certificateType === 'instalado' && !signatureData.certificado_instalado)
+                  )) ||
+                  (signatureType === 'eletronica' && !signatureData.assinatura_data)
+                }
+              >
+                Próximo: Posicionar Assinatura
+              </Button>
+            </div>
+          </form>
+        ) : (
+          // Etapa de posicionamento da assinatura
+          <div>
+            {documentUrl && (
+              <PDFViewer
+                documentUrl={documentUrl}
+                onPositionSelect={handlePositionSelect}
+                selectedPosition={selectedPosition}
+                signatureType={signatureType}
+              />
+            )}
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              justifyContent: 'space-between',
+              marginTop: '16px',
+              padding: '16px',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <Button
+                type="button"
+                $variant="outline"
+                onClick={handleBackToForm}
+              >
+                ← Voltar
+              </Button>
+              
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <Button
+                  type="button"
+                  $variant="outline"
+                  onClick={handleCloseSignModal}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleSubmitSignature}
+                  loading={signingInProgress}
+                  disabled={!selectedPosition || signingInProgress}
+                >
+                  Finalizar Assinatura
+                </Button>
+              </div>
+            </div>
           </div>
-        </form>
+        )}
       </Modal>
     </PageContainer>
   );

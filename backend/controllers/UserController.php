@@ -489,6 +489,79 @@ class UserController {
     }
     
     /**
+     * Lista todos os usuários da empresa para vinculação de documentos
+     */
+    public function getForDocumentBinding() {
+        try {
+            $authUser = JWT::requireAuth();
+            
+            $empresa_id = $_GET['empresa_id'] ?? null;
+            $filial_id = $_GET['filial_id'] ?? null;
+            
+            if (!$empresa_id) {
+                Response::validation(['empresa_id' => ['Empresa é obrigatória']]);
+                return;
+            }
+            
+            // Verificar permissões
+            if ($authUser['tipo_usuario'] == 2 && $authUser['empresa_id'] != $empresa_id) {
+                Response::forbidden('Acesso negado');
+                return;
+            }
+            
+            if ($authUser['tipo_usuario'] == 3) {
+                if ($authUser['empresa_id'] != $empresa_id || 
+                    ($filial_id && $authUser['filial_id'] != $filial_id)) {
+                    Response::forbidden('Acesso negado');
+                    return;
+                }
+            }
+            
+            $filters = [
+                'empresa_id' => $empresa_id
+                // Não filtrar por tipo_usuario para incluir todos os usuários
+            ];
+            
+            if ($filial_id) {
+                $filters['filial_id'] = $filial_id;
+            }
+            
+            $result = $this->userModel->list($filters, 1, 1000); // Buscar todos os usuários
+            
+            // Formatar para select
+            $users = array_map(function($user) {
+                return [
+                    'id' => $user['id'],
+                    'nome' => $user['nome'],
+                    'email' => $user['email'],
+                    'tipo_usuario_nome' => $this->getTipoUsuarioNome($user['tipo_usuario']),
+                    'filial_nome' => $user['filial_nome'] ?? 'Sem filial'
+                ];
+            }, $result['data']);
+            
+            Response::success($users);
+        } catch (Exception $e) {
+            Response::error('Erro ao buscar usuários: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Retorna o nome do tipo de usuário
+     */
+    private function getTipoUsuarioNome($tipo) {
+        switch ($tipo) {
+            case 1:
+                return 'Super Admin';
+            case 2:
+                return 'Admin da Empresa';
+            case 3:
+                return 'Assinante';
+            default:
+                return 'Desconhecido';
+        }
+    }
+    
+    /**
      * Desativa um usuário (soft delete)
      */
     public function deactivate($id) {
